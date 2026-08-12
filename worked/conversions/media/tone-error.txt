@@ -1,0 +1,43 @@
+﻿# tone.wav 轉換失敗的真實錯誤（markitdown 0.1.7 + [all] 依賴）
+
+環境：Windows，`pip install "markitdown[all]"`（含 `SpeechRecognition`），
+輸入為本站自製的 440Hz 純音調 WAV（非語音）。執行：
+
+    markitdown worked/conversions/media/tone.wav
+
+輸出（真實 traceback，節錄）：
+
+    File "D:\Temp\opencode\markitdown\packages\markitdown\src\markitdown\__main__.py", line 254, in main
+      result = markitdown.convert(
+    ...
+    File "...\markitdown\packages\markitdown\src\markitdown\_markitdown.py", line 649, in _convert
+      raise FileConversionException(attempts=failed_attempts)
+    markitdown._exceptions.FileConversionException: File conversion failed after 1 attempts:
+     - AudioConverter threw UnknownValueError with message:
+
+## 解讀
+
+1. `AudioConverter.convert()` 依序做兩件事：`exiftool_metadata()`（EXIF 中繼資料，
+   本機已安裝 exiftool 13.59，會成功）→ `transcribe_audio()`（語音轉錄）。
+2. `transcribe_audio()` 預設呼叫 `speech_recognition` 的 Google Web Speech API。
+3. 對 440Hz 純音調（無人聲），Google API 回傳「聽不懂」→ 拋出
+   `UnknownValueError`。
+4. `AudioConverter` 只捕獲 `MissingDependencyException`（依賴缺漏時優雅降級為
+   只有 metadata），`UnknownValueError` 沒有被處理 → 向外傳播，
+   `MarkItDown._convert()` 把它包成 `FileConversionException`。
+
+## 對照：優雅降級路徑
+
+若安裝的是「不含 audio-transcription 依賴」的 markitdown（例如 `pip install markitdown`
+不帶 `[all]`），`transcribe_audio()` 會改拋 `MissingDependencyException`，
+該例外被捕獲並跳過 → 轉換成功，只輸出中繼資料：
+
+    NumChannels: 1
+    SampleRate: 22050
+    AvgBytesPerSec: 44100
+    BitsPerSample: 16
+
+## 教學要點
+
+- 音訊轉錄需要**真人語音內容 + 網路連線 + Google API 可用**，缺一就會失敗或降級。
+- 容器/伺服器環境建議不要裝 `[all]`，改按需安裝 extras，讓失敗路徑變成優雅降級。

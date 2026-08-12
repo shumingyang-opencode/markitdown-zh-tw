@@ -1,0 +1,5 @@
+| name | role | city |
+| --- | --- | --- |
+| Alice | Engineer | Taipei |
+| Bob | Designer | Hsinchu |
+| Carol | Manager | Taichung |
