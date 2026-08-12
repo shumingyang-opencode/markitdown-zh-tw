@@ -1,0 +1,41 @@
+# NOTICE — markitdown-zh-tw（MarkItDown 繁體中文教學站）
+
+## 本站定位
+
+本 repo（`shumingyang-opencode/markitdown-zh-tw`）是 **Microsoft MarkItDown** 的
+**非官方第三方繁體中文教學站**。本站與 Microsoft、AutoGen Team 無關，不代表
+MarkItDown 官方立場。MarkItDown 為 Microsoft Corporation 的商標；本站僅在
+「描述性／教學」語境下使用該名稱。
+
+## 授權
+
+- 本站內容以 **MIT License** 釋出（與上游 MarkItDown 相同）。
+- 本 repo 的 [`LICENSE`](LICENSE) 為照抄自上游
+  `microsoft/markitdown` 的 MIT 授權全文（`Copyright (c) Microsoft Corporation.`）。
+- **原創內容**：本站所有中文解說、HTML/CSS 結構、圖示與教學文案均為本站原創，
+  以 MIT License 釋出。
+
+## 引用範圍
+
+- 本站僅**引述與解說**上游的 README、原始碼與授權條款，不散布官方二進位檔。
+- 本站收錄的「真實轉換輸出」與「graphify 互動知識圖譜」為本站以本機工具實跑產出：
+  - `worked/conversions/` — 以 markitdown（PyPI `markitdown` 0.1.7）實際轉換樣本檔的輸出；
+  - `worked/markitdown-source/` — 以 graphify（Apache-2.0）掃描上游源碼產生的互動圖與報告。
+- 樣本輸入檔為本站自製（Office/PDF/HTML/圖片/音訊等）或取自上游 repo 的檔案，已於各案例頁標註來源。
+
+## 商標
+
+- **MarkItDown**、**Microsoft** 為 Microsoft Corporation 的商標或其關聯公司之商標。
+- MIT 授權不含商標授權。本站僅在「描述性／教學」語境使用上述名稱，且於全站 footer
+  標示「與 Microsoft 無關」。
+
+## 對齊版本
+
+- 上游 repo：`microsoft/markitdown`
+- 對齊分支：`main`，釘選 commit：`fd239d5`（發行版 v0.1.7，2026-07-29）
+- 上游授權：MIT（`Copyright (c) Microsoft Corporation.`）
+
+## 回饋
+
+本站是教學站，不是官方文件。發現錯誤或想補充主題，歡迎到
+<https://github.com/shumingyang-opencode/markitdown-zh-tw/issues> 開 issue。
