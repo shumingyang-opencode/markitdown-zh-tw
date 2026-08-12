@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<title>程式碼對照 · __main__.py · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 程式碼對照——__main__.py 的 CLI 層逐函數講解：argparse 旗標、StreamInfo 提示、stdin/stdout。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>__main__.py — CLI 層</h1>
+  <div class="subtitle">argparse 解析 → 組 StreamInfo 提示 → 建 MarkItDown → 轉換 → 輸出</div>
+  <div class="badge-line">檔案：<code>packages/markitdown/src/markitdown/__main__.py</code>（281 行）· 由 pyproject <code>[project.scripts] markitdown = "markitdown.__main__:main"</code> 掛載</div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p>CLI 是 <code>MarkItDown</code> 類別的薄殼：解析旗標 → 把 <code>-x/-m/-c</code> 轉成
+<code>StreamInfo</code> 提示 → 依雲端旗標選 <code>docintel/cu/內建</code> 建實例 → 轉換 → 寫檔或印 stdout。
+<strong>沒有獨立的轉換邏輯</strong>——所有格式知識都在核心。</p>
+
+<hr>
+
+<h2>1. main()</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">main()</span> <span class="fn-tag">入口</span><span class="fn-one-liner">建 parser、parse_args、組 StreamInfo 提示、分派轉換。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>依序：</p>
+<ul>
+  <li><strong>usage 字串</strong>用 <code>dedent</code> 寫成 SYNTAX/EXAMPLE 教學式說明。</li>
+  <li><strong>-x / -m / -c 正規化</strong>：副檔名自動補 <code>.</code>、mimetype 必須含 <code>/</code>、
+      charset 用 <code>codecs.lookup</code> 驗證，非法即 <code>_exit_with_error</code>。</li>
+  <li>三個旗標任一存在就組 <code>StreamInfo</code> 提示。</li>
+  <li><code>--list-plugins</code> 印出 entry-point 清單後 <code>sys.exit(0)</code>。</li>
+  <li><strong>雲端互斥</strong>：<code>-d</code> 需 <code>-e</code>；<code>--use-cu</code> 需
+      <code>--cu-endpoint</code>；<code>--cu-file-types</code> 解析成
+      <code>ContentUnderstandingFileType</code> 列舉。</li>
+  <li>無 filename → 讀 <code>sys.stdin.buffer</code>（<code>convert_stream</code>）；有 → <code>convert</code>。</li>
+</ul>
+</div>
+</div>
+</details>
+
+<h2>2. 輸出與錯誤</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">_handle_output(args, result)</span> <span class="fn-tag">工具</span><span class="fn-one-liner">寫檔（UTF-8）或安全地印到 stdout。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>有 <code>-o</code> 就開檔寫 <code>result.markdown</code>；否則印 stdout 時用
+<code>encode(errors="replace").decode()</code> 避免 Windows 終端編碼炸掉。</p></div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">_exit_with_error(message)</span> <span class="fn-tag">工具</span><span class="fn-one-liner">印訊息並以 exit code 1 離開。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>CLI 參數錯誤（缺端點、mimetype 格式錯、charset 未知）的統一出口。</p></div>
+</div>
+</details>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

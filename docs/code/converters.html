@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<title>程式碼對照 · converters/ 概覽 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 程式碼對照——converters/ 目錄、accepts/convert 實作範例、文字家族與 _markdownify。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>converters/ 目錄 — 協定實作 + 文字家族</h1>
+  <div class="subtitle">以最簡單的 converter 示範 accepts/convert 協定，再拆 _markdownify</div>
+  <div class="badge-line">檔案：<code>converters/</code>（22 個轉換器 + 共用工具）</div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p><code>converters/</code> 每個檔都實作 <code>accepts() + convert()</code>。本頁看「最簡單的範例」
+（PlainText / Csv / Ipynb）與「被很多 converter 共用的 <code>_markdownify</code>」；
+Office / PDF / Web / Media / Azure 的細節在各自專頁。</p>
+
+<hr>
+
+<h2>1. PlainTextConverter — 最簡協定範例</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">accepts() / convert()</span> <span class="fn-tag">PlainText</span><span class="fn-one-liner">anything with content type text/plain。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>用 <code>stream_info.mimetype</code> 前綴 <code>text/plain</code>（或 <code>text/*</code>）判斷；
+<code>convert</code> 用 <code>charset-normalizer</code> 解碼 bytes → 回傳 Markdown 原文。
+這是「兜底」converter——裝 <code>[all]</code> 後所有純文字檔都會落回它。</p></div>
+</div>
+</details>
+
+<h2>2. CsvConverter</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">__init__ / accepts / convert</span> <span class="fn-tag">CSV</span><span class="fn-one-liner">把 CSV 讀成 Markdown 表格。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>constructor 用 <code>csv.Sniffer</code> 猜分隔符（逗號/分號/Tab…）；<code>accepts</code> 看
+mimetype 含 <code>text/csv</code> 或 extension <code>.csv</code>；<code>convert</code> 讀全部列，
+首列當表頭、其餘當資料列輸出 <code>| a | b |</code> 表格。</p></div>
+</div>
+</details>
+
+<h2>3. IpynbConverter — 懂 JSON 的 converter</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">accepts / convert / _convert(notebook_content)</span> <span class="fn-tag">Jupyter</span><span class="fn-one-liner">把 .ipynb（JSON）解析成 cells 的 Markdown。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>用 <code>json.load</code> 讀 notebook，依 cell type（markdown/code）輸出；
+code cell 顯示原始碼與執行結果。示範了「檔案格式其實是 JSON，直接用 json 模組解析」的做法。</p></div>
+</div>
+</details>
+
+<h2>4. _markdownify.py — HTML→Markdown 的客製引擎</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">_CustomMarkdownify(markdownify.MarkdownConverter)</span> <span class="fn-tag">共用</span><span class="fn-one-liner">覆寫 markdownify 的標題/連結/圖片/checkbox 轉換規則。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>markdownify 是 HTML→Markdown 函式庫，這裡覆寫四個行為：</p>
+<ul>
+  <li><code>convert_hn</code> — 標題保留為 <code>#</code>（含 <code>lang</code> 屬性處理）。</li>
+  <li><code>convert_a</code> — 保留連結，但移除 <code>javascript:</code> 連結、轉義 URI。</li>
+  <li><code>convert_img</code> — 圖片輸出 <code>![alt](src)</code>，處理 data URI（可截斷）。</li>
+  <li><code>convert_input</code> — checkbox 轉成 <code>[x]</code>/<code>[ ]</code>。</li>
+  <li><code>convert_soup</code> — 整個 soup 的轉換入口。</li>
+</ul>
+<p>HtmlConverter 與所有繼承它的 converter（Docx、Epub…）都共用這套規則。</p>
+</div>
+</div>
+</details>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

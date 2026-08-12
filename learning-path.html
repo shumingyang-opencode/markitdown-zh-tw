@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<title>學習路線 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 學習路線 L0→L4——從安裝、CLI/API、支援格式、運作原理到讀源碼的分層學習路徑。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="index.html">首頁</a>
+  <a href="map.html">概念地圖</a>
+  <a href="learning-path.html">學習路線</a>
+  <a href="install.html">安裝指南</a>
+  <a href="docs/index.html">文件教學</a>
+  <a href="docs/code/index.html">程式碼對照</a>
+  <a href="docs/worked.html">實作案例</a>
+  <a href="about.html">關於</a>
+</nav>
+<header>
+  <h1>學習路線</h1>
+  <div class="subtitle">從「裝起來」到「讀懂源碼」的五層路徑——每層都是可點卡片</div>
+</header>
+
+<div class="guide">
+
+<div class="level lv-emerald">
+  <div class="level-head">
+    <span class="level-badge">L0 · 裝好</span>
+    <span class="level-title">安裝與環境</span>
+    <span class="level-sub">5 分鐘</span>
+  </div>
+  <div class="card-grid">
+    <a class="card" href="install.html"><span class="c-name">pip extras</span><span class="c-zh">pip install 'markitdown[all]' 一次裝滿；或按格式選配 [pdf] [docx] [pptx] [xlsx]…</span></a>
+    <a class="card" href="install.html"><span class="c-name">uv / conda / source</span><span class="c-zh">uv tool install markitdown、conda create、git clone 後 pip install -e 的三種途徑。</span></a>
+    <a class="card" href="install.html"><span class="c-name">Docker</span><span class="c-zh">docker build -t markitdown:latest . 後以 stdin 管道餵檔。</span></a>
+    <a class="card" href="install.html"><span class="c-name">周邊套件</span><span class="c-zh">markitdown-mcp（MCP Server）與 markitdown-ocr（OCR 外掛）的安裝。</span></a>
+  </div>
+</div>
+
+<div class="level lv-cyan">
+  <div class="level-head">
+    <span class="level-badge">L1 · 跑起來</span>
+    <span class="level-title">CLI 與 Python API</span>
+    <span class="level-sub">15 分鐘</span>
+  </div>
+  <div class="card-grid">
+    <a class="card" href="docs/cli.html"><span class="c-name">CLI 基本用法</span><span class="c-zh">markitdown file.pdf > out.md、-o 輸出檔、stdin 管道輸入。</span></a>
+    <a class="card" href="docs/cli.html"><span class="c-name">CLI 進階旗標</span><span class="c-zh">-x / -m / -c 提示型別、-d 與 --use-cu 雲端轉換、-p 開外掛。</span></a>
+    <a class="card" href="docs/python-api.html"><span class="c-name">Python API</span><span class="c-zh">MarkItDown().convert() 一行轉換，result.markdown / text_content 取結果。</span></a>
+    <a class="card" href="docs/python-api.html"><span class="c-name">5 個 convert_*</span><span class="c-zh">convert / convert_local / convert_stream / convert_uri / convert_response 的取捨。</span></a>
+  </div>
+</div>
+
+<div class="level lv-amber">
+  <div class="level-head">
+    <span class="level-badge">L2 · 玩轉格式</span>
+    <span class="level-title">22 個轉換器全覽</span>
+    <span class="level-sub">30 分鐘</span>
+  </div>
+  <div class="card-grid">
+    <a class="card" href="docs/converters.html"><span class="c-name">Office 家族</span><span class="c-zh">DOCX（mammoth+OMML 數學）、XLSX/XLS（pandas）、PPTX（python-pptx）的輸出結構。</span></a>
+    <a class="card" href="docs/converters.html"><span class="c-name">PDF 家族</span><span class="c-zh">pdfminer.six + pdfplumber 分工；表格抽取與限制。</span></a>
+    <a class="card" href="docs/converters.html"><span class="c-name">Web / 網址</span><span class="c-zh">HTML、RSS、Wikipedia、YouTube、Bing SERP——直接餵 URL。</span></a>
+    <a class="card" href="docs/converters.html"><span class="c-name">Media / 封裝</span><span class="c-zh">圖片（EXIF+LLM 描述）、音訊（EXIF+轉錄）、ZIP、EPUB、CSV、JSON、iPython、Outlook。</span></a>
+    <a class="card" href="docs/worked.html"><span class="c-name">實作案例</span><span class="c-zh">本站以 markitdown 0.1.7 實跑 11 種格式的真實前後對照。</span></a>
+  </div>
+</div>
+
+<div class="level lv-fuchsia">
+  <div class="level-head">
+    <span class="level-badge">L3 · 讀原理</span>
+    <span class="level-title">調度管線與設計</span>
+    <span class="level-sub">1 小時</span>
+  </div>
+  <div class="card-grid">
+    <a class="card" href="docs/how-it-works.html"><span class="c-name">調度管線</span><span class="c-zh">StreamInfo 猜測 → magika 內容偵測 → priority 排序 → accepts → convert → 標準化。</span></a>
+    <a class="card" href="docs/how-it-works.html"><span class="c-name">容錯鏈</span><span class="c-zh">converter 失敗被記錄為 FailedConversionAttempt，最後統一拋 FileConversionException。</span></a>
+    <a class="card" href="docs/plugins.html"><span class="c-name">外掛系統</span><span class="c-zh">entry-point 群組 markitdown.plugin + register_converters()，如何攔截/取代內建 converter。</span></a>
+    <a class="card" href="docs/security.html"><span class="c-name">安全模型</span><span class="c-zh">I/O 權限等同目前程序、Sanitize inputs、只用最窄的 convert_* 函數。</span></a>
+    <a class="card" href="docs/mcp.html"><span class="c-name">MCP 整合</span><span class="c-zh">markitdown-mcp 用 convert_to_markdown(uri) 把工具接到任何 MCP agent。</span></a>
+  </div>
+</div>
+
+<div class="level lv-violet">
+  <div class="level-head">
+    <span class="level-badge">L4 · 讀源碼</span>
+    <span class="level-title">逐函數程式碼對照</span>
+    <span class="level-sub">自行安排</span>
+  </div>
+  <div class="card-grid">
+    <a class="card" href="docs/code/core.html"><span class="c-name">MarkItDown 類別</span><span class="c-zh">_markitdown.py：註冊、_get_stream_info_guesses、_convert 調度核心。</span></a>
+    <a class="card" href="docs/code/converters.html"><span class="c-name">Converter 協定</span><span class="c-zh">DocumentConverter / accepts / convert 介面與轉換器目錄。</span></a>
+    <a class="card" href="docs/code/office.html"><span class="c-name">Office 轉換器</span><span class="c-zh">docx（converter_utils 含 OMML→LaTeX）、xlsx、pptx 內部。</span></a>
+    <a class="card" href="docs/code/pdf.html"><span class="c-name">PDF 轉換器</span><span class="c-zh">pdfminer/pdfplumber 分工與 masterformat 表格處理。</span></a>
+    <a class="card" href="docs/code/ocr.html"><span class="c-name">OCR / 外掛套件</span><span class="c-zh">markitdown-ocr 的 LLMVisionOCRService 與 sample-plugin 開發範本。</span></a>
+  </div>
+</div>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站——中文解說為本站撰寫，英文原文與程式碼保留上游原貌。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

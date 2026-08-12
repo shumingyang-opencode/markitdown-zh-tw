@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<title>程式碼對照 · 媒體家族 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 程式碼對照——ImageConverter/AudioConverter 與 exiftool_metadata、llm_caption、transcribe_audio 工具。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>image / audio — 媒體家族</h1>
+  <div class="subtitle">「依賴式輸出」：EXIF、LLM 描述、語音轉錄各自可選</div>
+  <div class="badge-line">檔案：<code>_image_converter.py</code> · <code>_audio_converter.py</code> · <code>_llm_caption.py</code> · <code>_transcribe_audio.py</code> · <code>_exiftool.py</code></div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p>圖片與音訊的 converter 都「看工具存在與否決定輸出」：EXIF 中繼資料需要 <code>exiftool</code>；
+描述/OCR 需要 <code>llm_client</code>；轉錄需要 <code>SpeechRecognition</code>。所以「空輸出」、
+「降級」都是這兩個 converter 的<strong>正常行為</strong>（案例頁有實測）。</p>
+
+<hr>
+
+<h2>1. ImageConverter</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">accepts / convert / _get_llm_description</span> <span class="fn-tag">圖片</span><span class="fn-one-liner">輸出 EXIF 中繼資料 + 可選的 LLM 圖片描述。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p><code>convert</code> 兩段式：</p>
+<ul>
+  <li><code>exiftool_metadata()</code> 抽出 ImageSize / Title / DateTimeOriginal / GPSPosition 等。</li>
+  <li>有 <code>llm_client + llm_model</code> 時 <code>_get_llm_description</code> 把圖 base64 成
+      <code>data:image/...;base64,...</code> URI，呼叫 OpenAI 相容 <code>chat.completions</code>
+      取描述，輸出 <code># Description:</code>。</li>
+</ul>
+<p>兩者都缺 → 回傳空 Markdown。LLM 呼叫失敗會回 <code>None</code>（不炸）。</p>
+</div>
+</div>
+</details>
+
+<h2>2. AudioConverter</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">accepts / convert</span> <span class="fn-tag">音訊</span><span class="fn-one-liner">輸出 EXIF 中繼資料 + 可選的語音轉錄稿。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>EXIF 抽取後依副檔名判斷格式（wav/mp3/mp4），呼叫 <code>transcribe_audio()</code>；
+只有 <code>MissingDependencyException</code> 會被吞掉（降級成只有 metadata）。
+<strong>其他例外（如 SpeechRecognition 的 UnknownValueError）會向外傳播</strong>——這是案例頁
+「純音調檔失敗」的根源。</p></div>
+</div>
+</details>
+
+<h2>3. 共用工具</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">exiftool_metadata(file_stream, *, exiftool_path=None) / _parse_version</span> <span class="fn-tag">工具</span><span class="fn-one-liner">呼叫 exiftool 子程序取 JSON 中繼資料。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>以 <code>-j</code>（JSON）輸出跑 <code>exiftool -</code> 從 stdin 讀 bytes；
+<code>_parse_version</code> 檢查版本夠新。找不到 exiftool 就安靜回 <code>None</code>——這就是
+「沒裝 exiftool 就沒有 EXIF 輸出」的原因。</p></div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">llm_caption(...)</span> <span class="fn-tag">工具</span><span class="fn-one-liner">圖片 → base64 data URI → OpenAI 相容 API 取描述。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>PPTX 的圖片 alt 描述與 ImageConverter 共用這條路——預設 prompt
+「Write a detailed caption for this image.」。</p></div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">transcribe_audio(file_stream, *, audio_format="wav")</span> <span class="fn-tag">工具</span><span class="fn-one-liner">SpeechRecognition 轉錄；缺依賴拋 MissingDependencyException。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>用 <code>speech_recognition</code> 的 <code>recognize_google</code>（預設走 Google Web Speech API）。
+依賴沒裝時拋 <code>MissingDependencyException</code>（audio converter 會吞）；語音聽不懂時拋
+<code>UnknownValueError</code>（不會被吞，會讓整個轉換失敗）。</p></div>
+</div>
+</details>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<title>Python API · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown Python API——5 個 convert_* 方法、StreamInfo 線索卡、DocumentConverterResult、LLM 圖片描述參數。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 文件教學</a></div>
+<header>
+  <h1>Python API</h1>
+  <div class="subtitle">MarkItDown() 一行轉換；5 個 convert_* 方法各司其職</div>
+</header>
+
+<div class="guide">
+
+<h2>基本用法</h2>
+<pre>from markitdown import MarkItDown
+
+md = MarkItDown(enable_plugins=False)   # True 則開啟外掛
+result = md.convert("test.xlsx")
+print(result.text_content)</pre>
+
+<h2>回傳值：DocumentConverterResult</h2>
+<ul>
+  <li><code>result.markdown</code> — 原始 Markdown 字串</li>
+  <li><code>result.text_content</code> — 與 markdown 同義的別名（歷史命名）</li>
+  <li><code>result.title</code> — 文件標題（部分 converter 會填，如 EPUB）</li>
+</ul>
+
+<h2>5 個 convert_* 方法</h2>
+<table>
+  <tr><th>方法</th><th>輸入</th><th>何時用</th></tr>
+  <tr><td><code>convert()</code></td><td>str 路徑/URL、Path、requests.Response、BinaryIO</td><td>最通用，自動分派到下面四個</td></tr>
+  <tr><td><code>convert_local()</code></td><td>本機檔案路徑</td><td>只處理本機檔案（最窄、最安全）</td></tr>
+  <tr><td><code>convert_stream()</code></td><td>BinaryIO（bytes 流）</td><td>你已 open 一個 stream，且不需要本地路徑</td></tr>
+  <tr><td><code>convert_uri()</code></td><td>file: / data: / http: / https: URI</td><td>從 URI 讀取（含網址）；<code>convert_url()</code> 是它的別名</td></tr>
+  <tr><td><code>convert_response()</code></td><td>requests.Response</td><td>你自己控制 HTTP 請求（proxy、驗證、快取…），再把 response 交給它</td></tr>
+</table>
+
+<div class="callout info"><strong>安全建議</strong>：官方文件明確建議「只用最窄的 convert_* 函數」。
+若你的應用只需要讀本機檔案，就用 <code>convert_local()</code>；需要控制抓取就自己 <code>requests.get()</code> 再 <code>convert_response()</code>。詳見<a href="security.html">安全模型</a>。</div>
+
+<h2>StreamInfo（線索卡）</h2>
+<p>當來源缺少副檔名/MIME 線索（例如裸 stream），可以手動提供 <code>stream_info</code> 提示：</p>
+<pre>from markitdown import StreamInfo
+
+md = MarkItDown()
+result = md.convert_stream(
+    my_bytes_io,
+    stream_info=StreamInfo(extension=".docx", mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+)</pre>
+<p>CLI 的 <code>-x / -m / -c</code> 旗標背後就是建一個 <code>StreamInfo</code>。</p>
+
+<h2>LLM 圖片描述（pptx / 圖片）</h2>
+<pre>from markitdown import MarkItDown
+from openai import OpenAI
+
+client = OpenAI()
+md = MarkItDown(
+    llm_client=client,
+    llm_model="gpt-4o",
+    llm_prompt="optional custom prompt",   # 預設 "Write a detailed caption for this image."
+)
+result = md.convert("example.jpg")
+print(result.text_content)</pre>
+<p class="hint">任何 OpenAI 相容 client 都行（OpenAI、AzureOpenAI、本地 OpenAI-compatible server）。</p>
+
+<h2>外掛 + OCR</h2>
+<pre>md = MarkItDown(enable_plugins=True, llm_client=OpenAI(), llm_model="gpt-4o")
+result = md.convert("document_with_images.pdf")</pre>
+<p>詳見<a href="plugins.html">外掛系統</a>與 <a href="code/ocr.html">OCR 套件源碼</a>。</p>
+
+<h2>Azure 雲端轉換</h2>
+<pre># Document Intelligence
+md = MarkItDown(docintel_endpoint="&lt;endpoint&gt;")
+result = md.convert("test.pdf")
+
+# Content Understanding（零設定自動依檔案類型選 analyzer）
+md = MarkItDown(cu_endpoint="&lt;endpoint&gt;")
+result = md.convert("report.pdf")    # 文件 → prebuilt-documentSearch
+result = md.convert("meeting.mp4")   # 影片 → prebuilt-videoSearch
+print(result.markdown)               # 含 YAML front matter</pre>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

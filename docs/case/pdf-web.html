@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<title>案例：PDF + 網頁/網址 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 真實轉換案例——PDF（中文+表格）、HTML、CSV、JSON 的實際輸出與限制。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="../code/index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="../worked.html">← 實作案例</a></div>
+<header>
+  <h1>案例：PDF + 網頁/網址</h1>
+  <div class="subtitle">PDF（中文+表格）、HTML、CSV、JSON——真實工具輸出，本站實跑</div>
+  <div class="badge-line">markitdown 0.1.7 · 對齊 fd239d5</div>
+</header>
+
+<div class="guide">
+
+<h2>1. PDF（report.pdf）</h2>
+<p>輸入為 reportlab 產出的測試報告（STSong 中文字型 + 表格）。輸出由 pdfminer 抽取文字——
+觀察到「抽取順序」不一定是視覺順序（內文先於標題），表格以逐格換行呈現而非 Markdown 表格。
+這是 pdfminer 版面分析的固有特性，也是 PDF 轉換的主要限制之一。</p>
+<pre>這是一份用來示範 PDF 轉換的報告，包含標題、段落與表格。
+
+MarkItDown 測試報告
+
+效能數據
+
+方法
+
+耗時(ms)
+
+pdfminer
+
+pdfplumber
+
+120
+
+180</pre>
+<pre class="src">markitdown worked/conversions/pdf/report.pdf -o worked/conversions/pdf/report.md</pre>
+<div class="callout warn"><strong>重點</strong>：PDF 沒有「語意結構」可言——MarkItDown 只能盡量從版面猜。
+需要高品質 PDF 抽取（掃描檔、複雜表格）時，官方建議改用 Azure Content Understanding（見<a href="../cloud.html">雲端頁</a>）。</div>
+
+<h2>2. HTML（example.html）</h2>
+<p>標題、連結列表、表格都完整保留，是 MarkItDown 最擅長的格式之一。</p>
+<pre># MarkItDown 範例網頁
+
+這是 **HTML** 範例，用於示範 `HtmlConverter` 的轉換。
+
+## 連結
+
+* [MarkItDown GitHub](https://github.com/microsoft/markitdown)
+* [PyPI](https://pypi.org/project/markitdown/)
+
+## 表格
+
+| 功能 | 支援 |
+| --- | --- |
+| 標題 | ✅ |
+| 表格 | ✅ |</pre>
+<pre class="src">markitdown worked/conversions/web/example.html -o worked/conversions/web/example.md</pre>
+
+<h2>3. CSV（data.csv）</h2>
+<pre>| name | role | city |
+| --- | --- | --- |
+| Alice | Engineer | Taipei |
+| Bob | Designer | Hsinchu |
+| Carol | Manager | Taichung |</pre>
+<pre class="src">markitdown worked/conversions/web/data.csv -o worked/conversions/web/data-csv.md</pre>
+
+<h2>4. JSON（data.json）</h2>
+<p>JSON 沒有對應的專用 converter——落到 <code>PlainTextConverter</code>，輸出為縮排後的程式碼區塊。</p>
+<pre>{
+  "project": "markitdown-zh-tw",
+  "versions": [
+    0,
+    1,
+    7
+  ],
+  "tags": [
+    "markdown",
+    "llm"
+  ]
+}</pre>
+<pre class="src">markitdown worked/conversions/web/data.json -o worked/conversions/web/data-json.md</pre>
+
+<h2>5. 網址（直接餵 URL）</h2>
+<p>不需要先下載——<code>convert_uri</code> 直接抓取。真實輸出見 <a href="dogfood.html">dogfood 案例頁</a>
+（轉 GitHub 頁、PyPI 頁、raw README）。</p>
+
+<h2>重現方式</h2>
+<pre>markitdown worked/conversions/pdf/report.pdf   -o worked/conversions/pdf/report.md
+markitdown worked/conversions/web/example.html -o worked/conversions/web/example.md
+markitdown worked/conversions/web/data.csv     -o worked/conversions/web/data-csv.md
+markitdown worked/conversions/web/data.json    -o worked/conversions/web/data-json.md</pre>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

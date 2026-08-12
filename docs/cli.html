@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<title>CLI 指令參考 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown CLI 指令參考——全部旗標：-o/-x/-m/-c/-d/--use-cu/--cu-analyzer/-p/--list-plugins/--keep-data-uris。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 文件教學</a></div>
+<header>
+  <h1>CLI 指令參考</h1>
+  <div class="subtitle">markitdown 是 argparse 寫的命令列工具，讀 stdin 或檔案、輸出 stdout 或 -o 檔</div>
+</header>
+
+<div class="guide">
+
+<h2>基本語法</h2>
+<pre>SYNTAX:
+    markitdown &lt;OPTIONAL: FILENAME&gt;
+    若不給 FILENAME，從 stdin 讀取。
+
+EXAMPLE:
+    markitdown example.pdf
+    cat example.pdf | markitdown
+    markitdown &lt; example.pdf
+    markitdown example.pdf -o example.md
+    markitdown example.pdf &gt; example.md</pre>
+
+<h2>旗標一覽</h2>
+<table>
+  <tr><th>旗標</th><th>用途</th></tr>
+  <tr><td><code>-v, --version</code></td><td>顯示版本號並離開</td></tr>
+  <tr><td><code>-o, --output FILE</code></td><td>輸出到檔案（UTF-8）；否則寫 stdout</td></tr>
+  <tr><td><code>-x, --extension EXT</code></td><td>提示副檔名（stdin 讀取時很有用），自動補上 <code>.</code></td></tr>
+  <tr><td><code>-m, --mime-type TYPE</code></td><td>提示 MIME type（格式必須含 <code>/</code>）</td></tr>
+  <tr><td><code>-c, --charset CS</code></td><td>提示編碼（如 UTF-8），用 codecs 正規化</td></tr>
+  <tr><td><code>-d, --use-docintel</code></td><td>改用 Azure Document Intelligence（需 <code>-e</code> 端點）</td></tr>
+  <tr><td><code>-e, --endpoint URL</code></td><td>Document Intelligence Endpoint（<code>-d</code> 必填）</td></tr>
+  <tr><td><code>--use-cu, --use-content-understanding</code></td><td>改用 Azure Content Understanding（需 <code>--cu-endpoint</code>）</td></tr>
+  <tr><td><code>--cu-endpoint URL</code></td><td>Content Understanding Endpoint（<code>--use-cu</code> 必填）</td></tr>
+  <tr><td><code>--cu-analyzer ID</code></td><td>指定 CU analyzer ID；預設依檔案類型自動選</td></tr>
+  <tr><td><code>--cu-file-types TYPES</code></td><td>只讓這些格式走 CU（逗號分隔，如 <code>pdf,jpeg,mp4</code>）</td></tr>
+  <tr><td><code>-p, --use-plugins</code></td><td>啟用第三方外掛（預設關閉）</td></tr>
+  <tr><td><code>--list-plugins</code></td><td>列出已安裝外掛後離開</td></tr>
+  <tr><td><code>--keep-data-uris</code></td><td>保留 base64 data URI（預設截斷）</td></tr>
+</table>
+
+<div class="callout warn"><strong>注意</strong>：<code>-d</code> 與 <code>--use-cu</code> 是互斥群組，不能同時用。</div>
+
+<h2>常用範例</h2>
+<pre># 基本轉換
+markitdown report.pdf -o report.md
+
+# 從 stdin 讀取並提示副檔名
+cat data.bin | markitdown -x .csv
+
+# 轉換網址（CLI 直接吃 http/https/file/data URI）
+markitdown https://github.com/microsoft/markitdown -o page.md
+
+# 開外掛
+markitdown --use-plugins document.pdf
+
+# 用 Azure Document Intelligence
+markitdown file.pdf -o out.md -d -e "https://&lt;resource&gt;.cognitiveservices.azure.com/"
+
+# 用 Azure Content Understanding（指定 analyzer）
+markitdown invoice.pdf --use-cu --cu-endpoint "&lt;endpoint&gt;" --cu-analyzer "my-invoice-analyzer"</pre>
+
+<h2>實際輸出示範</h2>
+<p>本站 dogfood 實跑範例（markitdown 0.1.7）：</p>
+<pre>$ markitdown https://raw.githubusercontent.com/microsoft/markitdown/fd239d5d.../README.md -o readme.md
+$ markitdown https://github.com/microsoft/markitdown -o github-page.md
+$ markitdown https://pypi.org/project/markitdown/ -o pypi-page.md</pre>
+<p>完整輸出見 <a href="case/dogfood.html">dogfood 案例頁</a>。</p>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<title>程式碼對照 · StreamInfo / URI / 例外 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 程式碼對照——_stream_info.py、_uri_utils.py、_exceptions.py 逐函數講解。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>_stream_info / _uri_utils / _exceptions</h1>
+  <div class="subtitle">「線索卡」資料結構、URI 解析、例外層</div>
+  <div class="badge-line">檔案：<code>_stream_info.py</code> · <code>_uri_utils.py</code> · <code>_exceptions.py</code></div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p>這三個檔案是核心的「周邊積木」：<code>StreamInfo</code> 是整個調度系統流通的資料結構
+（graphify 掃描顯示它是全圖連線數最多的 god node，154 條邊）；<code>_uri_utils</code> 負責
+<code>file:</code>/<code>data:</code> URI 的解析；<code>_exceptions</code> 定義例外層。</p>
+
+<hr>
+
+<h2>1. StreamInfo（_stream_info.py）</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">StreamInfo（dataclass, kw_only, frozen）</span> <span class="fn-tag">核心</span><span class="fn-one-liner">描述檔案「看起來是什麼」的線索卡。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>六個欄位都可為 None：<code>mimetype / extension / charset / filename / local_path / url</code>。
+<code>frozen=True</code>（不可變）+ <code>kw_only=True</code>——安全且防錯位。
+來源：本機路徑、URL、HTTP header（Content-Type/Content-Disposition）、或呼叫端手動提供。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">StreamInfo.copy_and_update(*args, **kwargs)</span> <span class="fn-tag">工具</span><span class="fn-one-liner">複製並合併其他 StreamInfo / kwargs，回傳新實例。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>因為 frozen，要「在既有線索上補強」就得複製。邏輯：<code>asdict</code> 當基底，
+對傳入的 StreamInfo 只蓋非 None 欄位、對 kwargs 全部蓋上。這是 <code>_convert</code> 各入口
+疊加猜測的核心工具。</p></div>
+</div>
+</details>
+
+<h2>2. URI 解析（_uri_utils.py）</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">file_uri_to_path(file_uri) -&gt; (netloc, path)</span> <span class="fn-tag">工具</span><span class="fn-one-liner">把 file:// URI 拆成 netloc 與本機 path。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>用 <code>urllib.request.url2pathname</code> 解出 path；netloc 非空且非 localhost 時
+<code>convert_uri</code> 會拒絕（防 file://evil-host/... 這種繞路）。</p></div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">parse_data_uri(uri) -&gt; (mimetype, attributes, data)</span> <span class="fn-tag">工具</span><span class="fn-one-liner">把 data: URI 解成 mimetype、屬性與 bytes。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>處理 <code>data:&lt;mimetype&gt;;charset=...;base64,&lt;payload&gt;</code> 格式，
+解 base64 後回傳，供 <code>convert_uri</code> 丟給 <code>convert_stream</code>。</p></div>
+</div>
+</details>
+
+<h2>3. 例外層（_exceptions.py）</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">MarkItDownException（base）</span> <span class="fn-tag">例外</span><span class="fn-one-liner">所有自訂例外的共同父類。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>讓呼叫端可以「一個 except 抓全部 MarkItDown 錯誤」。</p></div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">MissingDependencyException / UnsupportedFormatException</span> <span class="fn-tag">例外</span><span class="fn-one-liner">缺依賴 / 無任何 converter 接受。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p><code>MissingDependencyException</code> 是「優雅降級」的訊號——audio 等 converter 捕獲它
+就跳過該功能繼續輸出 metadata；<code>UnsupportedFormatException</code> 表示型別完全沒人認得。</p></div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">FailedConversionAttempt / FileConversionException</span> <span class="fn-tag">例外</span><span class="fn-one-liner">單次嘗試失敗的紀錄；聚合全部失敗的容器。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p><code>FailedConversionAttempt</code> 夾帶 <code>converter</code> 與 <code>exc_info</code>
+（例外型別+值+traceback）；<code>FileConversionException.__init__</code> 收 attempts 清單，
+<code>str()</code> 時把每個 converter 的失敗原因列出來——這是 <code>_convert</code> 全軍覆沒時
+能看到「每個人為什麼失敗」的關鍵。</p></div>
+</div>
+</details>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

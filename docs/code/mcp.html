@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<title>程式碼對照 · markitdown-mcp · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 程式碼對照——markitdown-mcp 套件源碼：convert_to_markdown 工具、STDIO/HTTP/SSE 三種 transport。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>markitdown-mcp 套件</h1>
+  <div class="subtitle">把 MarkItDown 包成 FastMCP server，一個工具 + 三種 transport</div>
+  <div class="badge-line">檔案：<code>packages/markitdown-mcp/src/markitdown_mcp/__main__.py</code>（140 行）</div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p>整個套件只有一個檔案有實際邏輯。核心是 <code>FastMCP("markitdown")</code> 實例 + 一個
+<code>@mcp.tool()</code> 工具；<code>--http</code> 模式用 Starlette 同時提供 Streamable HTTP 與 SSE。</p>
+
+<hr>
+
+<h2>1. 工具定義</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">convert_to_markdown(uri: str) -&gt; str</span> <span class="fn-tag">工具</span><span class="fn-one-liner">接收 http:/https:/file:/data: URI，回傳 Markdown。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>一行核心邏輯：<code>MarkItDown(enable_plugins=check_plugins_enabled()).convert_uri(uri).markdown</code>。
+<strong>這是整個 MCP 套件唯一暴露的工具</strong>——所有的格式知識都在核心，這裡只做轉發。</p></div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">check_plugins_enabled() -&gt; bool</span> <span class="fn-tag">工具</span><span class="fn-one-liner">讀環境變數 MARKITDOWN_ENABLE_PLUGINS 決定要不要開外掛。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p><code>true/1/yes</code>（不分大小寫）都算開啟。用環境變數而非參數，方便容器/部署層設定。</p></div>
+</div>
+</details>
+
+<h2>2. HTTP / SSE 模式</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">create_starlette_app(mcp_server, *, debug=False)</span> <span class="fn-tag">Starlette</span><span class="fn-one-liner">同時掛載 /sse 與 /mcp 兩條路由。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>建 <code>SseServerTransport("/messages/")</code> 與
+<code>StreamableHTTPSessionManager</code>，routes：</p>
+<ul>
+  <li><code>/sse</code> — SSE 長連線（<code>handle_sse</code>）。</li>
+  <li><code>/mcp</code> — Streamable HTTP（<code>handle_streamable_http</code>）。</li>
+  <li><code>/messages/</code> — SSE 的回應 POST 端點。</li>
+</ul>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">main()</span> <span class="fn-tag">入口</span><span class="fn-one-liner">--http/--sse 切 transport；非本機綁定會印大警告。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>argparse 收 <code>--http / --sse / --host / --port</code>；<code>--sse</code> 是棄用別名。
+特別的工程細節：<code>host</code> 不是 <code>127.0.0.1/localhost</code> 時，會向 stderr 印一段
+<strong>非常明確的安全警告</strong>（無認證、以使用者權限運作、能讀任何檔案）。這就是
+「預設只綁 localhost」背後的防呆。</p></div>
+</div>
+</details>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

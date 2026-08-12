@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<title>運作原理 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 運作原理——convert() 調度管線：StreamInfo 猜測、magika 內容偵測、priority 排序、accepts/convert、輸出標準化與容錯鏈。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 文件教學</a></div>
+<header>
+  <h1>運作原理</h1>
+  <div class="subtitle">MarkItDown 的 convert() 是「把檔案交給『對的』converter」的調度器</div>
+</header>
+
+<div class="guide">
+
+<p>MarkItDown 的核心不是「讀懂檔案」，而是<strong>「猜測檔案是哪種格式，然後交給對應的 converter」</strong>。
+所有格式都遵循同一個 <code>DocumentConverter</code> 協定（<code>accepts()</code> + <code>convert()</code>），
+由 <code>MarkItDown._convert()</code> 依優先序逐一嘗試，直到有人成功。</p>
+
+<h2>調度管線五步驟</h2>
+
+<h3>1. 建立 StreamInfo 猜測清單（線索卡）</h3>
+<p><code>StreamInfo</code> 是描述「這個檔案看起來是什麼」的資料結構，欄位含
+<code>mimetype / extension / charset / filename / local_path / url</code>。
+來源可以是副檔名、Content-Type header、Content-Disposition 的 filename、或 URL 的副檔名。</p>
+<pre>StreamInfo(
+    mimetype="application/pdf",
+    extension=".pdf",
+    filename="report.pdf",
+    local_path="report.pdf",
+)</pre>
+
+<h3>2. magika 讀位元組補強猜測</h3>
+<p><code>_get_stream_info_guesses()</code> 會再呼叫 <strong>magika</strong>（Google 的內容型別偵測模型，
+純本機、零網路）直接讀檔案位元組猜型別，並用 <code>charset-normalizer</code> 猜文字編碼。
+如果 magika 的猜測與線索<strong>衝突</strong>（例如副檔名說 <code>.txt</code> 但內容是 HTML），
+就會產生<strong>多個 guess</strong>，依序嘗試。</p>
+
+<h3>3. 依 priority 排序 converters</h3>
+<p>每個 converter 註冊時帶一個 <code>priority</code>：<strong>越小越先試</strong>。
+內建 converter 大多為 <code>0.0</code>（特定格式）；<code>PlainTextConverter / HtmlConverter / ZipConverter</code>
+是 <code>10.0</code>（通用兜底，放最後）。排序是穩定排序，同優先級保持註冊順序、後註冊者在前。</p>
+
+<h3>4. 依序問 accepts()，接受就 convert()</h3>
+<p>對每個 guess × 每個 converter，先問 <code>converter.accepts(file_stream, stream_info)</code>
+（通常用 mimetype / extension 判斷），接受後呼叫 <code>converter.convert(...)</code> 得到 Markdown。
+任一 converter 拋例外時不會立刻失敗——被記錄為 <code>FailedConversionAttempt</code>，繼續試下一個。</p>
+
+<h3>5. 輸出標準化 + 錯誤聚合</h3>
+<p>成功後會把輸出做標準化：去掉每行行尾空白、把連續 3+ 個換行壓成 2 個。
+全部 converter 都失敗時，若有失敗紀錄 → 拋 <code>FileConversionException</code>（內含所有嘗試）；
+完全沒人接受 → 拋 <code>UnsupportedFormatException</code>。</p>
+
+<div class="callout info"><strong>圖解</strong>：
+<pre style="margin:0.5rem 0 0;">convert("report.pdf")
+  └─ 線索：副檔名 .pdf + magika 內容偵測
+  └─ guesses = [StreamInfo(.pdf), StreamInfo(magika 猜測)]
+  └─ 依 priority 排序 converters：[PDF, DOCX, XLSX, ..., PlainText(10), Html(10), Zip(10)]
+  └─ PDF.accepts() → True → PDF.convert() → Markdown 字串
+  └─ 標準化輸出 → DocumentConverterResult(markdown=..., title=...)</pre></div>
+
+<h2>容錯鏈：converter 失敗不代表整個轉換失敗</h2>
+<p>這是 MarkItDown 最體貼的設計：某個 converter 在 <code>convert()</code> 中途拋例外時，
+該例外被 <code>except Exception</code> 接住、包成 <code>FailedConversionAttempt</code> 存進清單，
+<code>file_stream</code> 會 <code>seek</code> 回原位置，繼續試下一個 converter。
+最後若全軍覆沒才統一拋 <code>FileConversionException(attempts=...)</code>，方便你一次看到所有失敗原因。</p>
+
+<details class="en-toggle">
+<summary>English original — the fail-safe loop</summary>
+<div>
+<pre>for stream_info in stream_info_guesses + [StreamInfo()]:
+    for converter_registration in sorted_registrations:
+        converter = converter_registration.converter
+        if converter.accepts(file_stream, stream_info, **_kwargs):
+            try:
+                res = converter.convert(file_stream, stream_info, **_kwargs)
+            except Exception:
+                failed_attempts.append(FailedConversionAttempt(
+                    converter=converter, exc_info=sys.exc_info()))
+            finally:
+                file_stream.seek(cur_pos)
+        if res is not None:
+            res.text_content = normalize(res.text_content)
+            return res
+if failed_attempts:
+    raise FileConversionException(attempts=failed_attempts)
+raise UnsupportedFormatException(...)</pre>
+</div>
+</details>
+
+<h2>依賴式輸出：圖片與音訊</h2>
+<p>圖片與音訊的輸出「依賴本機工具或 LLM」：</p>
+<ul>
+  <li><strong>圖片</strong>：EXIF 中繼資料需要 <code>exiftool</code>；描述需要 <code>llm_client + llm_model</code>（multimodal LLM）。兩者都缺 → 輸出為空。</li>
+  <li><strong>音訊</strong>：EXIF 需要 <code>exiftool</code>；轉錄需要 <code>SpeechRecognition</code>（預設 Google Web API）。轉錄失敗的例外不一定被吞掉（見<a href="case/media-archive.html">媒體案例</a>）。</li>
+</ul>
+
+<h2>為什麼選 Markdown？</h2>
+<p>Markdown 非常接近純文字、token 效率高，同時又能表達標題、清單、表格、連結等結構；
+主流 LLM（如 GPT-4o）原生「會講」Markdown。這是它存在的根本理由。</p>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<title>Docker · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown Docker 用法——建映像、stdin 管道轉換、markitdown-mcp Docker 啟動與掛載本機目錄。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 文件教學</a></div>
+<header>
+  <h1>Docker</h1>
+  <div class="subtitle">不污染本機 Python 環境，一行指令把檔案丟進容器轉換</div>
+</header>
+
+<div class="guide">
+
+<h2>建映像與使用</h2>
+<pre># 從 repo 根目錄（含 Dockerfile）建映像
+docker build -t markitdown:latest .
+
+# stdin 管道轉換
+docker run --rm -i markitdown:latest &lt; ~/your-file.pdf &gt; output.md</pre>
+
+<p>docker 版本非常適合：<strong>不想在本機裝 Python 依賴</strong>、或<strong>需要乾淨隔離</strong>（配合外掛/多版本）的場景。</p>
+
+<h2>markitdown-mcp 的 Docker 用法</h2>
+<pre># 建映像
+docker build -t markitdown-mcp:latest .
+
+# 啟動（遠端 URI 即可，本機檔案需掛載）
+docker run -it --rm markitdown-mcp:latest
+
+# 掛載本機目錄：容器內以 /workdir 存取
+docker run -it --rm -v /home/user/data:/workdir markitdown-mcp:latest</pre>
+
+<h2>搭配 Claude Desktop</h2>
+<pre>{
+  "mcpServers": {
+    "markitdown": {
+      "command": "docker",
+      "args": ["run", "--rm", "-i", "-v", "/home/user/data:/workdir", "markitdown-mcp:latest"]
+    }
+  }
+}</pre>
+
+<div class="callout info"><strong>安全提示</strong>：容器預設無法存取本機檔案；掛載目錄等於把該路徑開放給容器內程序。
+只掛載需要的目錄，並注意 <code>markitdown-mcp</code> 無認證機制。</div>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

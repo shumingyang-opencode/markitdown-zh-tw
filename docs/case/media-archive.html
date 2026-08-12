@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<title>案例：媒體 + 封裝 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 真實轉換案例——圖片 EXIF、音訊轉錄失敗的真實錯誤、ZIP 逐檔、EPUB 中繼資料。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="../code/index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="../worked.html">← 實作案例</a></div>
+<header>
+  <h1>案例：媒體 + 封裝</h1>
+  <div class="subtitle">圖片 / 音訊 / ZIP / EPUB——含一次真實的失敗示範</div>
+  <div class="badge-line">markitdown 0.1.7 · exiftool 13.59（EXIFTOOL_PATH 指定）</div>
+</header>
+
+<div class="guide">
+
+<h2>1. 圖片（photo.jpg）</h2>
+<p>輸入為 PIL 產生、帶 EXIF（Make/Model/DateTimeOriginal）的 JPEG。有 <code>exiftool</code> 時輸出 EXIF
+中繼資料；沒有時輸出為空。LLM 描述需要 <code>llm_client + llm_model</code>（本站無 key，未示範）。</p>
+<pre>ImageSize: 640x360
+DateTimeOriginal: 2026:08:12 10:00:00</pre>
+<pre class="src">EXIFTOOL_PATH=&lt;exiftool&gt; markitdown worked/conversions/media/photo.jpg -o worked/conversions/media/photo.md</pre>
+
+<h2>2. 音訊（tone.wav）——真實失敗示範</h2>
+<p>輸入是本站自製的 440Hz 純音調 WAV。用含 <code>[all]</code> 依賴（SpeechRecognition）的 markitdown
+轉換時，Google Web Speech API「聽不懂」純音調 → 拋 <code>UnknownValueError</code>，
+<code>AudioConverter</code> 沒接住（它只捕獲 <code>MissingDependencyException</code>）→ 整個轉換失敗。</p>
+<pre>File "...\markitdown\packages\markitdown\src\markitdown\_markitdown.py", line 649, in _convert
+  raise FileConversionException(attempts=failed_attempts)
+markitdown._exceptions.FileConversionException: File conversion failed after 1 attempts:
+ - AudioConverter threw UnknownValueError with message:</pre>
+
+<p><strong>對照：優雅降級路徑。</strong>若 markitdown「不含 audio-transcription 依賴」（例如只 <code>pip install markitdown</code>），
+<code>transcribe_audio()</code> 改拋 <code>MissingDependencyException</code> → 被接住略過 → 轉換成功、只輸出 metadata：</p>
+<pre>NumChannels: 1
+SampleRate: 22050
+AvgBytesPerSec: 44100
+BitsPerSample: 16</pre>
+<p>完整錯誤檔與解讀收在 <code>worked/conversions/media/tone-error.txt</code>。</p>
+
+<div class="callout warn"><strong>教學要點</strong>：音訊轉錄需要「真人語音 + 網路 + Google API 可用」三者齊備。
+伺服器/容器環境建議按需安裝 extras（不要無腦 <code>[all]</code>），讓失敗路徑變成優雅降級。</div>
+
+<h2>3. ZIP（archive.zip）</h2>
+<p>ZIP 是「遞迴容器」——解壓到暫存目錄，依副檔名用對應 converter 逐檔轉換，保留結構、結束清理。</p>
+<pre>Content from the zip file `worked\conversions\archive\archive.zip`:
+
+## File: readme.txt
+
+Hello from a ZIP file!
+
+## File: data/notes.md
+
+# Notes
+
+ZIP 內含多個檔案，會被逐一轉換。
+
+## File: data/todo.txt
+
+1. Convert zip
+2. Profit</pre>
+<pre class="src">markitdown worked/conversions/archive/archive.zip -o worked/conversions/archive/archive.md</pre>
+
+<h2>4. EPUB（book.epub）</h2>
+<p>解析 container.xml → content.opf → spine，輸出中繼資料 + 逐章（HtmlConverter）轉換。</p>
+<pre>**Title:** MarkItDown 迷你電子書
+**Authors:** markitdown-zh-tw
+**Language:** zh-Hant
+**Identifier:** urn:uuid:markitdown-zh-tw-sample
+
+# 第一章：什麼是 MarkItDown？
+
+MarkItDown 是微軟出品的檔案轉 Markdown 工具，適合餵給 LLM 使用。</pre>
+<pre class="src">markitdown worked/conversions/archive/book.epub -o worked/conversions/archive/book.md</pre>
+
+<h2>重現方式</h2>
+<pre># 圖片（需 exiftool）
+EXIFTOOL_PATH=/path/to/exiftool markitdown worked/conversions/media/photo.jpg -o out.md
+
+# 音訊（優雅降級：不含 audio-transcription 依賴的 markitdown）
+markitdown worked/conversions/media/tone.wav -o out.md
+
+# ZIP / EPUB
+markitdown worked/conversions/archive/archive.zip -o out.md
+markitdown worked/conversions/archive/book.epub  -o out.md</pre>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

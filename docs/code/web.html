@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<title>程式碼對照 · 網頁與封裝家族 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 程式碼對照——YouTube/Wikipedia/RSS/ZIP/EPUB/Outlook 轉換器逐函數講解。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>YouTube / Wikipedia / RSS / ZIP / EPUB / Outlook</h1>
+  <div class="subtitle">「看 URL 決定」的專用網址 converter + 遞迴/封裝容器</div>
+  <div class="badge-line">檔案：<code>_youtube_converter.py</code> · <code>_wikipedia_converter.py</code> · <code>_rss_converter.py</code> · <code>_zip_converter.py</code> · <code>_epub_converter.py</code> · <code>_outlook_msg_converter.py</code></div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p>這家族分兩種：<strong>URL 專用 converter</strong>（YouTube / Wikipedia / RSS）在 <code>accepts</code>
+裡看 <code>stream_info.url</code> 決定接單，只取正文/標題/字幕；<strong>容器 converter</strong>
+（ZIP / EPUB / Outlook .msg）把一包東西拆開遞迴處理。</p>
+
+<hr>
+
+<h2>1. YouTubeConverter — URL 專用</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">accepts / convert / _get / _findKey / _retry_operation</span> <span class="fn-tag">YouTube</span><span class="fn-one-liner">抓影片標題、描述、字幕，輸出 Markdown。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p><code>accepts</code> 看 URL 是否 <code>youtube.com</code> / <code>youtu.be</code>。<code>convert</code>
+用 <code>youtube-transcript-api</code> 抓字幕（需要 <code>[youtube-transcription]</code> extra），
+並抓頁面 meta 取標題/描述。有趣的工程細節：</p>
+<ul>
+  <li><code>_findKey(json, key)</code> — 遞迴搜尋 YouTube 嵌入 JSON 的巢狀 key。</li>
+  <li><code>_retry_operation</code> — 對容易失敗的網路操作做 3 次重試、延遲 2 秒。</li>
+</ul>
+</div>
+</div>
+</details>
+
+<h2>2. WikipediaConverter — 只取正文</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">accepts / convert</span> <span class="fn-tag">Wikipedia</span><span class="fn-one-liner">對 wikipedia.org 頁面只取「主文內容」。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>URL 以 <code>wikipedia.org/wiki/</code> 開頭才接；<code>convert</code> 抓頁面後
+只保留正文節點，丟掉導覽/側欄/頁尾——這是「專用 converter 為何存在」的最佳例子。</p></div>
+</div>
+</details>
+
+<h2>3. RssConverter — XML 雙格式</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">accepts / _check_xml / _feed_type / convert / _parse_atom_type / _parse_rss_type / _parse_content / _get_data_by_tag_name</span> <span class="fn-tag">RSS/Atom</span><span class="fn-one-liner">用 defusedxml 安全解析 RSS 或 Atom feed。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p><code>_check_xml</code> 先偷讀串流前幾個位元組確認是 <code>&lt;?</code>（XML）；
+<code>_feed_type</code> 依 root element 判斷 <code>rss</code> 或 <code>feed</code>（Atom），
+再分派到 <code>_parse_rss_type</code> / <code>_parse_atom_type</code>，輸出各項目標題/連結/內容。</p></div>
+</div>
+</details>
+
+<h2>4. ZipConverter — 遞迴容器</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">__init__(markitdown) / accepts / convert</span> <span class="fn-tag">ZIP</span><span class="fn-one-liner">解壓到暫存目錄，用同一 MarkItDown 實例逐檔遞迴轉換。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>constructor 接收 <code>markitdown</code> 本身（拿來遞迴轉換子檔）；<code>accepts</code> 看
+<code>application/zip</code> / <code>.zip</code>。輸出以 <code>## File: &lt;路徑&gt;</code> 分節、
+維持原始結構、結束後清理暫存目錄（<code>tempfile.TemporaryDirectory</code>）。</p></div>
+</div>
+</details>
+
+<h2>5. EpubConverter（繼承 HtmlConverter）</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">accepts / convert / _get_text_from_node / _get_all_texts_from_nodes</span> <span class="fn-tag">EPUB</span><span class="fn-one-liner">container.xml → content.opf → spine 逐章轉換。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>用 <code>defusedxml.minidom</code> 安全解析：<code>META-INF/container.xml</code> 找
+<code>content.opf</code> 路徑 → 解析 metadata（title/authors/language…）與 manifest/spine →
+依 spine 順序把每章 XHTML 用內部的 <code>HtmlConverter</code> 轉 Markdown。輸出最前面插入
+<code>**Title:** ...</code> 中繼資料。</p></div>
+</div>
+</details>
+
+<h2>6. OutlookMsgConverter — 會偷讀串流的 converter</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">accepts / convert / _get_stream_data</span> <span class="fn-tag">Outlook .msg</span><span class="fn-one-liner">用 olefile 讀 .msg 的郵件標頭與內文。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>docstring 特別提到它是「accepts 需要讀 stream 才能判斷」的例子——判斷 .msg 的 OLE 結構後
+<strong>務必把 stream 位置復原</strong>。輸出 From/To/Subject 標頭 + 內文。</p></div>
+</div>
+</details>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

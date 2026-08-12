@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<title>程式碼對照 · PDF 轉換器 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 程式碼對照——_pdf_converter.py 逐函數講解：pdfminer/pdfplumber 分工、masterformat 編號合併、表格抽取。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>_pdf_converter.py — PDF 轉換器</h1>
+  <div class="subtitle">pdfminer 抽文字、pdfplumber 抽表格、外加一段「版面後處理」</div>
+  <div class="badge-line">檔案：<code>packages/markitdown/src/markitdown/converters/_pdf_converter.py</code></div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p>PDF 沒有語意結構，所以這檔最「工程導向」：先嘗試用 <strong>pdfplumber</strong> 抽表格，
+再與 <strong>pdfminer</strong> 的文字抽取互補；最後有一段 post-process 把「MasterFormat 風格的部分編號」
+（<code>.1</code>、<code>.2</code>…）與下一行合併，避免被版面切碎。</p>
+
+<hr>
+
+<h2>1. 後處理工具函數</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">_merge_partial_numbering_lines(text)</span> <span class="fn-tag">post-process</span><span class="fn-one-liner">把 <code>.1</code> 等部分編號與後續文字合併回同一行。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>MasterFormat 文件用 <code>.1 The intent of this RFP...</code> 這種部分編號；
+pdfminer 常把它切成 <code>.1</code> 換行再接內文。此函數用 regex 偵測並黏回。</p></div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">_to_markdown_table(table) / fmt_row(row)</span> <span class="fn-tag">工具</span><span class="fn-one-liner">把二維 list 轉成 Markdown 表格（含分隔列）。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>輸出 <code>| c1 | c2 |</code> + <code>| --- | --- |</code> 分隔列，處理格內換行與空值。</p></div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">_extract_form_content_from_words(page)</span> <span class="fn-tag">工具</span><span class="fn-one-liner">依 word 座標重組「表單式」版面文字。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>對非標準表格的 PDF，從 pdfplumber page 的 word 物件按座標（行/列）重建內容，
+補救 pdfminer 的抽取順序問題。</p></div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">extract_cells(info) / _extract_tables_from_words(page)</span> <span class="fn-tag">表格</span><span class="fn-one-liner">從 pdfplumber 的 tables/lines 或 word 座標抽出儲存格。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>先嘗試 pdfplumber <code>page.extract_tables()</code>；對「無邊框表格」則退回
+<code>_extract_tables_from_words</code>——用 word 的 x/y 座標聚類成欄與列。</p></div>
+</div>
+</details>
+
+<h2>2. PdfConverter 主體</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">accepts() / convert()</span> <span class="fn-tag">PDF</span><span class="fn-one-liner">mimetype application/pdf 或副檔名 .pdf 即接受。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p><code>convert</code> 用 <code>pdfplumber.open</code> 逐頁處理：對每頁先試表格抽取、再疊加
+文字抽取（兩者都會跑），最後跑 <code>_merge_partial_numbering_lines</code> 後處理。掃描版（無文字層）
+或複雜版面是已知弱點——官方建議高品質抽取改用 Azure Content Understanding。</p></div>
+</div>
+</details>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

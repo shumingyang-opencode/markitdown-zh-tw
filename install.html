@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<title>安裝指南 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 安裝指南——pip extras、uv、conda、從 source、Docker、markitdown-mcp / markitdown-ocr 安裝與疑難排解。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="index.html">首頁</a>
+  <a href="map.html">概念地圖</a>
+  <a href="learning-path.html">學習路線</a>
+  <a href="install.html">安裝指南</a>
+  <a href="docs/index.html">文件教學</a>
+  <a href="docs/code/index.html">程式碼對照</a>
+  <a href="docs/worked.html">實作案例</a>
+  <a href="about.html">關於</a>
+</nav>
+<header>
+  <h1>安裝指南</h1>
+  <div class="subtitle">MarkItDown 需要 Python 3.10 以上；建議用虛擬環境避免依賴衝突</div>
+  <div class="badge-line">PyPI：<code>markitdown</code> · 對齊版本 0.1.7</div>
+</header>
+
+<div class="guide">
+
+<h2>1. 建立虛擬環境（推薦）</h2>
+<pre>python -m venv .venv
+.venv\Scripts\activate        # Windows
+source .venv/bin/activate     # macOS / Linux</pre>
+<p class="hint">用 <code>uv</code> 更快：<code>uv venv --python 3.12 .venv</code>，之後一律用 <code>uv pip install</code>。</p>
+
+<h2>2. 安裝</h2>
+<pre># 一次裝滿所有格式的依賴（最省事）
+pip install 'markitdown[all]'</pre>
+
+<p>或者按需安裝，減少體積與攻擊面：</p>
+<pre># 只需要 PDF、Word、簡報
+pip install 'markitdown[pdf, docx, pptx]'</pre>
+
+<h2>3. Optional Dependencies（extras）一覽</h2>
+<table>
+  <tr><th>Extra</th><th>啟用的格式/功能</th></tr>
+  <tr><td><code>[all]</code></td><td>全部選配依賴</td></tr>
+  <tr><td><code>[pptx]</code></td><td>PowerPoint（python-pptx）</td></tr>
+  <tr><td><code>[docx]</code></td><td>Word（mammoth + lxml）</td></tr>
+  <tr><td><code>[xlsx]</code></td><td>Excel .xlsx（pandas + openpyxl）</td></tr>
+  <tr><td><code>[xls]</code></td><td>舊版 Excel .xls（pandas + xlrd）</td></tr>
+  <tr><td><code>[pdf]</code></td><td>PDF（pdfminer.six + pdfplumber）</td></tr>
+  <tr><td><code>[outlook]</code></td><td>Outlook .msg（olefile）</td></tr>
+  <tr><td><code>[az-doc-intel]</code></td><td>Azure Document Intelligence</td></tr>
+  <tr><td><code>[az-content-understanding]</code></td><td>Azure Content Understanding</td></tr>
+  <tr><td><code>[audio-transcription]</code></td><td>音訊轉錄（pydub + SpeechRecognition）</td></tr>
+  <tr><td><code>[youtube-transcription]</code></td><td>YouTube 字幕（youtube-transcript-api）</td></tr>
+</table>
+
+<h2>4. 從 source 安裝（對齊特定 commit）</h2>
+<pre>git clone git@github.com:microsoft/markitdown.git
+cd markitdown
+git checkout &lt;commit&gt;                 # 例如 fd239d5（v0.1.7）
+pip install -e 'packages/markitdown[all]'</pre>
+
+<h2>5. Docker</h2>
+<pre>docker build -t markitdown:latest .
+docker run --rm -i markitdown:latest &lt; ~/your-file.pdf &gt; output.md</pre>
+
+<h2>6. 周邊套件</h2>
+<pre># MCP Server（把 markitdown 接上任何 MCP agent）
+pip install markitdown-mcp
+
+# OCR 外掛（LLM Vision 抽取 PDF/DOCX/PPTX/XLSX 內嵌圖片文字）
+pip install markitdown-ocr
+pip install openai   # 或任何 OpenAI 相容 client</pre>
+
+<h2>7. 驗證安裝</h2>
+<pre>markitdown --version          # 0.1.7
+markitdown sample.pdf -o out.md
+markitdown --list-plugins     # 列出已安裝的第三方外掛</pre>
+
+<div class="callout warn"><strong>注意</strong>：markitdown 的 <code>--list-plugins</code> 與外掛功能預設關閉，
+必須安裝外掛套件並用 <code>--use-plugins</code> 或 <code>enable_plugins=True</code> 才會生效。</div>
+
+<h2>8. 疑難排解</h2>
+<ul>
+  <li><strong>不支援的格式錯誤</strong>：檔案類型未被任何 converter 接受——通常是缺少對應 extras（例如 PDF 沒裝 <code>[pdf]</code>），或真的不支援該格式。</li>
+  <li><strong>圖片/音訊輸出為空</strong>：圖片 EXIF 需要 <code>exiftool</code>（<code>EXIFTOOL_PATH</code>），描述需要 <code>llm_client + llm_model</code>；音訊同理。</li>
+  <li><strong>音訊轉錄拋 UnknownValueError</strong>：SpeechRecognition 聽不懂內容（非語音/無網路/Google API 不可用）——見<a href="docs/case/media-archive.html">媒體案例頁</a>。</li>
+  <li><strong>Windows 中文亂碼</strong>：輸出到檔案用 <code>-o</code>（UTF-8），避免 console 編碼問題。</li>
+  <li><strong>MCP Server 無法連線</strong>：確認 <code>markitdown-mcp</code> 在 PATH 上，或改用 Docker 啟動。</li>
+</ul>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站——中文解說為本站撰寫，英文原文與程式碼保留上游原貌。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

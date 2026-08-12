@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<title>關於 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 繁中教學站——關於本站的授權、方法、免責聲明與版本釘選。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="index.html">首頁</a>
+  <a href="map.html">概念地圖</a>
+  <a href="learning-path.html">學習路線</a>
+  <a href="install.html">安裝指南</a>
+  <a href="docs/index.html">文件教學</a>
+  <a href="docs/code/index.html">程式碼對照</a>
+  <a href="docs/worked.html">實作案例</a>
+  <a href="about.html">關於</a>
+</nav>
+<header>
+  <h1>關於本站</h1>
+  <div class="subtitle">授權 · 方法 · 免責聲明 · 版本釘選</div>
+</header>
+
+<div class="guide">
+
+<h2>本站是什麼</h2>
+<p>本站是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的
+<strong>非官方繁體中文教學站</strong>。目標是把整個 repo（程式碼、轉換器、CLI、外掛、MCP、
+Azure 整合、測試）做成「中英對照」的策展式解說——不逐檔鏡像，而是挑「值得教學」的內容深入講解。</p>
+
+<h2>方法</h2>
+<ul>
+  <li><strong>文件頁</strong>：中文口語解說為主文，英文原文以可展開 <code>&lt;details&gt;</code> 保留。</li>
+  <li><strong>程式碼頁</strong>：每個函數一個收縮塊（signature + 中文用途 + 關鍵邏輯），核心函數附逐行中文註解。</li>
+  <li><strong>實作案例</strong>：所有數字與輸出都是本站以本機工具實跑取得，不是示意圖。</li>
+  <li><strong>版本釘選</strong>：內容對齊上游 <code>main @ fd239d5</code>（v0.1.7），可追溯。</li>
+</ul>
+
+<h2>我們怎麼跑的</h2>
+<ol class="timeline">
+  <li>建立 uv 虛擬環境，從對齊 commit 的源碼安裝 <code>markitdown[all]</code>（0.1.7）。</li>
+  <li>用 <code>scripts/generate-samples.py</code> 產生各格式樣本輸入檔（python-docx / openpyxl / python-pptx / reportlab / Pillow / piexif）。</li>
+  <li>對每種格式執行 <code>markitdown &lt;file&gt; -o out.md</code>，把真實輸出收進 <code>worked/conversions/</code>。</li>
+  <li>用 markitdown 轉 markitdown 自己（README / pyproject.toml / Dockerfile / GitHub 頁 / PyPI 頁）作 dogfooding。</li>
+  <li>用 graphify 0.9.40（<code>--code-only</code>，純本機 AST）掃描源碼，產出互動知識圖譜與 GRAPH_REPORT。</li>
+  <li>把 graph.html 中文化成 graph-zh.html（UI 字串替換，節點標籤保留英文）。</li>
+</ol>
+
+<div class="license-box">
+<strong>授權</strong>：本站內容以 <strong>MIT License</strong> 釋出（與上游相同），
+<a href="LICENSE">LICENSE</a> 為照抄自上游的 MIT 全文；<a href="NOTICE">NOTICE</a> 為本站自行撰寫
+（非官方教學站聲明、引用範圍、原創內容授權）。<br>
+<strong>商標</strong>：MarkItDown 與 Microsoft 為 Microsoft Corporation 或其關聯公司之商標。
+MIT 授權不含商標授權；本站僅在「描述性／教學」語境使用該名稱，並於全站 footer 標示「與 Microsoft 無關」。
+</div>
+
+<h2>免責聲明</h2>
+<p>本站為第三方社群教學站，<strong>與 Microsoft、AutoGen Team 無關</strong>，不代表 MarkItDown
+官方立場。本站未散布官方二進位，僅引述實際運行輸出與解說上游文件。</p>
+
+<h2>上游同步</h2>
+<p>對齊上游分支 <strong><code>main</code></strong>，釘選 commit <strong><code>fd239d5</code></strong>
+（發行版 v0.1.7，2026-07-29）。<code>.github/workflows/check-upstream.yml</code> 每月 1 日自動檢查
+上游最新 SHA 並更新首頁徽章，也可手動觸發。</p>
+
+<h2>回饋與貢獻</h2>
+<p>發現翻譯錯誤或想補充主題，歡迎到
+<a href="https://github.com/shumingyang-opencode/markitdown-zh-tw/issues">GitHub Issues</a> 開 issue；
+想貢獻轉換案例，依 <a href="https://github.com/shumingyang-opencode/markitdown-zh-tw#如何新增一個轉換案例">README 流程</a>發 PR。</p>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站——中文解說為本站撰寫，英文原文與程式碼保留上游原貌。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 由 OpenCode 建置</div>
+  <div class="footer-license">授權檔案：<a href="LICENSE">MIT LICENSE</a> · <a href="NOTICE">NOTICE</a></div>
+</footer>
+</div>
+</body>
+</html>

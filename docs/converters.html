@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<title>轉換器全覽 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 22 個轉換器全覽——格式、依賴、輸出結構、限制。Office/PDF/Web/Media/封裝 五大家族。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 文件教學</a></div>
+<header>
+  <h1>轉換器全覽</h1>
+  <div class="subtitle">22 個內建轉換器：格式、依賴、輸出結構、限制</div>
+</header>
+
+<div class="guide">
+
+<h2>完整清單</h2>
+<table>
+  <tr><th>Converter</th><th>輸入</th><th>依賴（extras）</th><th>輸出重點</th></tr>
+  <tr><td><code>PlainTextConverter</code></td><td>text/*（純文字、程式碼…）</td><td>無（magika 偵測）</td><td>原文重排、猜編碼</td></tr>
+  <tr><td><code>HtmlConverter</code></td><td>text/html（網頁、HTML 檔）</td><td>無（beautifulsoup4 內建）</td><td>標題/清單/連結/表格</td></tr>
+  <tr><td><code>RssConverter</code></td><td>RSS / Atom feed</td><td>無</td><td>feed 項目列表</td></tr>
+  <tr><td><code>WikipediaConverter</code></td><td>Wikipedia 頁面 URL</td><td>無</td><td>只取正文內容</td></tr>
+  <tr><td><code>YouTubeConverter</code></td><td>YouTube 網址</td><td><code>[youtube-transcription]</code></td><td>標題 + 描述 + 字幕</td></tr>
+  <tr><td><code>BingSerpConverter</code></td><td>Bing 搜尋結果頁</td><td>無</td><td>有機搜尋結果</td></tr>
+  <tr><td><code>IpynbConverter</code></td><td>Jupyter Notebook</td><td>無</td><td>cells + 輸出</td></tr>
+  <tr><td><code>PdfConverter</code></td><td>PDF</td><td><code>[pdf]</code></td><td>文字 + 表格（masterformat 合併）</td></tr>
+  <tr><td><code>DocxConverter</code></td><td>Word .docx</td><td><code>[docx]</code></td><td>標題/清單/表格/數學</td></tr>
+  <tr><td><code>XlsxConverter</code></td><td>Excel .xlsx</td><td><code>[xlsx]</code></td><td>每工作表一個表格</td></tr>
+  <tr><td><code>XlsConverter</code></td><td>舊版 Excel .xls</td><td><code>[xls]</code></td><td>同上（xlrd）</td></tr>
+  <tr><td><code>PptxConverter</code></td><td>PowerPoint .pptx</td><td><code>[pptx]</code></td><td>每張投影片分頁 + 表格 + 圖片 alt</td></tr>
+  <tr><td><code>ImageConverter</code></td><td>JPG / PNG</td><td>exiftool + <code>llm_client</code></td><td>EXIF 中繼資料 + LLM 描述</td></tr>
+  <tr><td><code>AudioConverter</code></td><td>WAV / MP3 / M4A / MP4</td><td>exiftool + <code>[audio-transcription]</code></td><td>EXIF 中繼資料 + 轉錄稿</td></tr>
+  <tr><td><code>OutlookMsgConverter</code></td><td>Outlook .msg</td><td><code>[outlook]</code></td><td>郵件標頭 + 內文</td></tr>
+  <tr><td><code>ZipConverter</code></td><td>ZIP 壓縮檔</td><td>無</td><td>逐檔遞迴轉換 + 保留結構</td></tr>
+  <tr><td><code>EpubConverter</code></td><td>EPUB 電子書</td><td>無</td><td>中繼資料 + spine 各章</td></tr>
+  <tr><td><code>CsvConverter</code></td><td>CSV</td><td>無</td><td>Markdown 表格</td></tr>
+  <tr><td><code>DocumentIntelligenceConverter</code></td><td>PDF 等（Azure）</td><td><code>[az-doc-intel]</code></td><td>雲端版面分析</td></tr>
+  <tr><td><code>ContentUnderstandingConverter</code></td><td>文件/圖/音/影（Azure）</td><td><code>[az-content-understanding]</code></td><td>多模態 + YAML front matter</td></tr>
+</table>
+<p class="hint">另有 <code>ConverterRegistration</code> 的「後註冊者優先」與 priority 機制，詳見<a href="how-it-works.html">運作原理</a>。</p>
+
+<h2>五大家族重點</h2>
+
+<h3>Office：DOCX / XLSX / PPTX</h3>
+<ul>
+  <li><strong>DOCX</strong>：經 mammoth 轉 HTML 再轉 Markdown；<code>converter_utils/docx/</code> 先把 OMML 數學轉成 LaTeX。</li>
+  <li><strong>XLSX</strong>：pandas 讀取，每個工作表輸出 <code>## 工作表名</code> + Markdown 表格。</li>
+  <li><strong>PPTX</strong>：每張投影片輸出 <code>&lt;!-- Slide number: N --&gt;</code> 註解 + 標題 + 項目 + 表格。</li>
+</ul>
+
+<h3>PDF</h3>
+<ul>
+  <li>pdfminer.six 負責文字抽取、pdfplumber 負責表格。</li>
+  <li>後處理把 MasterFormat 風格的「部分編號」(.1 / .2…) 與下一行合併。</li>
+  <li>掃描版（無文字層）或複雜版面是已知限制。</li>
+</ul>
+
+<h3>Web / 網址</h3>
+<ul>
+  <li>HTML / RSS / Wikipedia / YouTube / Bing SERP 都可以直接餵 URL（<code>convert_uri</code>）。</li>
+  <li>HTTP 請求會帶 <code>Accept: text/markdown, text/html;q=0.9...</code>，若伺服器支援先給 Markdown。</li>
+</ul>
+
+<h3>Media：圖片 / 音訊</h3>
+<ul>
+  <li>圖片：EXIF（需 exiftool）+ LLM 描述（需 <code>llm_client/llm_model</code>，multimodal）。</li>
+  <li>音訊：EXIF（需 exiftool）+ 轉錄（需 SpeechRecognition，預設 Google API）。</li>
+  <li>兩者「依賴式輸出」——缺工具就少一段內容（或失敗），見<a href="case/media-archive.html">媒體案例</a>。</li>
+</ul>
+
+<h3>封裝：ZIP / EPUB / CSV / JSON / iPython / Outlook</h3>
+<ul>
+  <li><strong>ZIP</strong>：解壓到暫存目錄、依副檔名遞迴轉換每一檔、保留結構，結束清理。</li>
+  <li><strong>EPUB</strong>：解析 container.xml → content.opf → spine，逐章用 HtmlConverter 轉。</li>
+  <li><strong>CSV</strong>：直接轉 Markdown 表格；<strong>JSON</strong>：縮排成程式碼區塊（PlainText）。</li>
+</ul>
+
+<h2>實作案例連結</h2>
+<p>想看這些 converter 的<strong>真實輸出</strong>，跳到<a href="worked.html">實作案例</a>——本站用 0.1.7 實跑 11 種格式的前後對照。</p>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<title>Azure 雲端轉換 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown Azure 雲端轉換——Document Intelligence vs Content Understanding 對照表、自訂 analyzer、計費注意。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 文件教學</a></div>
+<header>
+  <h1>Azure 雲端轉換</h1>
+  <div class="subtitle">Document Intelligence 與 Content Understanding 兩條雲端路徑</div>
+</header>
+
+<div class="guide">
+
+<p>內建 converter 全部在本機離線運作。需要更高品質（掃描 PDF、複雜表格、影片、結構化欄位）時，
+MarkItDown 提供兩條 Azure 雲端路徑。</p>
+
+<h2>兩者對照</h2>
+<table>
+  <tr><th>能力</th><th>內建 converter</th><th>Document Intelligence</th><th>Content Understanding</th></tr>
+  <tr><td>文件轉換</td><td>離線、格式特定抽取</td><td>雲端版面分析</td><td>雲端多模態抽取</td></tr>
+  <tr><td>結構化欄位</td><td>不支援</td><td>此整合未暴露</td><td>YAML front matter（analyzer 欄位）</td></tr>
+  <tr><td>自訂 analyzer</td><td>不支援</td><td>此整合不可設定</td><td><code>cu_analyzer_id</code> 支援</td></tr>
+  <tr><td>音訊 / 影片</td><td>僅基本音訊、無影片</td><td>不支援</td><td>音訊 + 影片 analyzer</td></tr>
+  <tr><td>成本</td><td>純本機</td><td>Azure API 計費</td><td>Azure API 計費</td></tr>
+</table>
+
+<h2>何時用 Content Understanding</h2>
+<ul>
+  <li><strong>音訊與影片</strong>——CU 是影片的唯一選項、音訊的高品質雲端選項。</li>
+  <li><strong>結構化欄位抽取</strong>——預建或自訂 analyzer 抽出發票金額、收據日期、合約條款，序列化成 YAML front matter。</li>
+  <li><strong>高品質文件抽取</strong>——掃描 PDF、複雜表格、多頁文件的雲端版面分析。</li>
+  <li><strong>單一 API 涵蓋所有模態</strong>——一個 <code>cu_endpoint</code> 自動路由文件/圖/音/影。</li>
+</ul>
+
+<h2>Content Understanding 用法</h2>
+<pre>pip install 'markitdown[az-content-understanding]'
+
+# CLI
+markitdown report.pdf --use-cu --cu-endpoint "&lt;endpoint&gt;"
+
+# Python（零設定，自動依檔案類型選 analyzer）
+from markitdown import MarkItDown
+md = MarkItDown(cu_endpoint="&lt;endpoint&gt;")
+print(md.convert("report.pdf").markdown)    # 文件 → prebuilt-documentSearch
+print(md.convert("meeting.mp4").markdown)   # 影片 → prebuilt-videoSearch
+
+# 自訂 analyzer（領域欄位抽取）
+md = MarkItDown(cu_endpoint="&lt;endpoint&gt;", cu_analyzer_id="my-invoice-analyzer")
+print(md.convert("invoice.pdf").markdown)
+# 輸出含 YAML front matter：
+# ---
+# contentType: document
+# fields:
+#   VendorName: CONTOSO LTD.
+#   InvoiceDate: '2019-11-15'
+# ---
+# &lt;!-- page 1 --&gt;</pre>
+
+<h2>計費與範圍控制</h2>
+<div class="callout warn"><strong>計費注意</strong>：每個 <code>convert()</code> 呼叫，只要是 CU 路由的格式，
+就是一筆<strong>可計費的 Azure API 呼叫</strong>。用 <code>cu_file_types</code> 限制哪些格式才走 CU：</div>
+<pre>from markitdown.converters import ContentUnderstandingFileType
+
+md = MarkItDown(
+    cu_endpoint="&lt;endpoint&gt;",
+    cu_file_types=[ContentUnderstandingFileType.PDF],   # 只有 PDF 走 CU
+)</pre>
+
+<h2>Document Intelligence 用法</h2>
+<pre>pip install 'markitdown[az-doc-intel]'
+
+# CLI
+markitdown file.pdf -o document.md -d -e "&lt;document_intelligence_endpoint&gt;"
+
+# Python
+md = MarkItDown(docintel_endpoint="&lt;document_intelligence_endpoint&gt;")
+result = md.convert("test.pdf")
+print(result.text_content)</pre>
+
+<h2>本站說明</h2>
+<p>Azure 兩條路徑都需要雲端資源與計費，<strong>本站不實跑</strong>；以上內容為官方 README 的忠實翻譯與對照整理。
+建立資源的指引見 <a href="https://learn.microsoft.com/azure/ai-services/document-intelligence/">Document Intelligence</a>
+與 <a href="https://learn.microsoft.com/azure/ai-services/content-understanding/">Content Understanding</a> 官方文件。</p>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<title>案例：graphify 掃描 MarkItDown 源碼 · MarkItDown 繁中教學站</title>
+<meta name="description" content="用 graphify 掃描 MarkItDown 自己——907 節點、1967 邊、71 社群的互動知識圖譜（EN/ZH 雙版本）。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="../code/index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="../worked.html">← 實作案例</a></div>
+<header>
+  <h1>案例：graphify 掃描 MarkItDown 源碼</h1>
+  <div class="subtitle">用知識圖譜工具分析轉換工具——可操作的互動知識圖譜</div>
+  <div class="badge-line">graphify 0.9.40（--code-only，純本機 AST，零 LLM）· 語料：markitdown @ fd239d5</div>
+</header>
+
+<div class="guide">
+
+<h2>這是什麼</h2>
+<p>本站用 <strong>graphify</strong> 掃描 MarkItDown 上游源碼（<code>packages/</code> 四個套件的
+<code>src/</code> + <code>tests/</code>，77 個程式檔），產出可查詢的知識圖譜。這是「用知識圖譜工具
+分析轉換工具」的 meta 示範——點節點、拖曳、搜尋都能玩。</p>
+
+<h2>本站跑的數字</h2>
+<table>
+  <tr><th>項目</th><th>數值</th></tr>
+  <tr><td>節點</td><td>907</td></tr>
+  <tr><td>邊</td><td>1,967（91% EXTRACTED · 9% INFERRED）</td></tr>
+  <tr><td>社群</td><td>71</td></tr>
+  <tr><td>Token 成本</td><td>0（純本機 AST）</td></tr>
+  <tr><td>語料</td><td>190 檔 / 77 程式檔，對齊 commit <code>fd239d5</code></td></tr>
+</table>
+
+<h2>God Nodes（最核心的抽象）</h2>
+<pre>1. StreamInfo                  - 154 edges
+2. MarkItDown                  -  70 edges
+3. DocumentConverterResult     -  67 edges
+4. DocumentConverter           -  50 edges
+5. MissingDependencyException  -  42 edges
+6. oMath2Latex                 -  31 edges
+7. ContentUnderstandingFileType - 29 edges
+8. HtmlConverter               -  27 edges
+9. LLMVisionOCRService         -  23 edges
+10. ContentUnderstandingConverter - 23 edges</pre>
+<p class="hint">圖清楚顯示：<code>StreamInfo</code> 是全圖最核心的資料結構——幾乎每個 converter 都依賴它。</p>
+
+<h2>互動圖（中文化界面）</h2>
+<div class="graph-embed">
+  <div class="graph-embed-bar">
+    <span class="g-title">MarkItDown 源碼知識圖譜（中文界面）</span>
+    <span class="g-links"><a href="../../worked/markitdown-source/graph-zh.html" target="_blank">開新分頁 ↗</a><a href="../../worked/markitdown-source/graph.html" target="_blank">英文版 ↗</a></span>
+  </div>
+  <iframe src="../../worked/markitdown-source/graph-zh.html" loading="lazy" title="graphify 互動知識圖譜（中文界面）"></iframe>
+</div>
+
+<h2>報告</h2>
+<p>完整結構報告（社群、surprising connections、完整 god-node 清單）在
+<a href="../../worked/markitdown-source/GRAPH_REPORT.md">GRAPH_REPORT.md</a>。</p>
+
+<h2>重現方式</h2>
+<pre># 1. 準備語料（對齊釘選 commit）
+git clone https://github.com/microsoft/markitdown.git
+git -C markitdown checkout fd239d5d2be43d9b68329730206b9312c7d5a388
+mkdir -p raw/corpus && cp -R markitdown/packages raw/corpus/ && cp markitdown/Dockerfile raw/corpus/
+
+# 2. 抽取（--code-only 零 key；raw/ 在 .gitignore，需 --no-gitignore）
+graphify extract raw/corpus --code-only --no-gitignore
+
+# 3. 分群 + 產出 graph.html / GRAPH_REPORT.md
+graphify cluster-only raw/corpus --no-label
+
+# 4. 收錄 + 中文化
+cp raw/corpus/graphify-out/graph.html worked/markitdown-source/
+cp raw/corpus/graphify-out/GRAPH_REPORT.md worked/markitdown-source/
+python scripts/localize-graph.py   # → graph-zh.html</pre>
+
+<h2>已知限制</h2>
+<ul>
+  <li>社群命名：本機無 LLM key，社群名稱保留「社群 N」placeholder。</li>
+  <li>語料含 <code>tests/</code>，圖中混有大量測試節點——刻意的，可觀察「測試如何呼叫主程式」。</li>
+  <li>節點標籤為程式識別符，保持英文（僅 UI 中文化）。</li>
+</ul>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

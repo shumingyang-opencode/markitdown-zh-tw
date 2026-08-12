@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<title>架構總覽 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 架構總覽——4 個套件、核心類別職責表、套件依賴與模組結構。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 文件教學</a></div>
+<header>
+  <h1>架構總覽</h1>
+  <div class="subtitle">四個套件 + 一條調度鏈</div>
+</header>
+
+<div class="guide">
+
+<h2>套件組成</h2>
+<p>repo 用 monorepo 結構，<code>packages/</code> 下有四組獨立套件（都可各自 pip 安裝）：</p>
+<table>
+  <tr><th>套件</th><th>PyPI 名稱</th><th>職責</th></tr>
+  <tr><td><code>packages/markitdown/</code></td><td><code>markitdown</code></td><td>核心：MarkItDown 類別 + 22 個內建轉換器 + CLI</td></tr>
+  <tr><td><code>packages/markitdown-mcp/</code></td><td><code>markitdown-mcp</code></td><td>MCP Server：把核心包成 <code>convert_to_markdown(uri)</code> 工具</td></tr>
+  <tr><td><code>packages/markitdown-ocr/</code></td><td><code>markitdown-ocr</code></td><td>OCR 外掛：LLM Vision 抽取 PDF/DOCX/PPTX/XLSX 內嵌圖片文字</td></tr>
+  <tr><td><code>packages/markitdown-sample-plugin/</code></td><td><code>markitdown-sample-plugin</code></td><td>外掛開發範本：RtfConverter 完整範例</td></tr>
+</table>
+
+<h2>核心類別職責表</h2>
+<table>
+  <tr><th>類別 / 模組</th><th>檔名</th><th>職責</th></tr>
+  <tr><td><code>MarkItDown</code></td><td><code>_markitdown.py</code></td><td>對外入口：註冊 converter、5 個 convert_* 方法、調度核心 <code>_convert()</code>、StreamInfo 猜測</td></tr>
+  <tr><td><code>DocumentConverter</code></td><td><code>_base_converter.py</code></td><td>所有轉換器的抽象父類：定義 <code>accepts()</code> / <code>convert()</code> 協定與 <code>priority</code></td></tr>
+  <tr><td><code>DocumentConverterResult</code></td><td><code>_base_converter.py</code></td><td>轉換結果：<code>markdown</code> / <code>text_content</code> / <code>title</code></td></tr>
+  <tr><td><code>ConverterRegistration</code></td><td><code>_markitdown.py</code></td><td>converter + priority 的註冊資料（frozen dataclass）</td></tr>
+  <tr><td><code>StreamInfo</code></td><td><code>_stream_info.py</code></td><td>檔案的「線索卡」：mimetype / extension / charset / filename / url</td></tr>
+  <tr><td><code>converters/</code></td><td><code>converters/*.py</code></td><td>22 個內建轉換器，各自實作 accepts/convert</td></tr>
+  <tr><td><code>converter_utils/</code></td><td><code>converter_utils/docx/*</code></td><td>DOCX 前處理工具：OMML（Office Math）→ LaTeX</td></tr>
+  <tr><td><code>__main__.py</code></td><td><code>__main__.py</code></td><td>CLI：argparse 解析 → 建 MarkItDown → 呼叫 convert</td></tr>
+  <tr><td><code>_exceptions.py</code></td><td><code>_exceptions.py</code></td><td>例外層：FileConversionException / UnsupportedFormatException / MissingDependencyException</td></tr>
+</table>
+
+<h2>依賴方向</h2>
+<pre>CLI (__main__) ──→ MarkItDown ──→ converters/（22 個）──→ 第三方函式庫（mammoth / pdfminer / openpyxl…）
+                        │  └──→ _stream_info / magika / charset-normalizer（型別猜測）
+                        └──→ plugin entry-point（markitdown.plugin）──→ markitdown-ocr 等外掛
+markitdown-mcp ──→ MarkItDown（convert_to_markdown 工具）
+markitdown-ocr ──→ MarkItDown（在 priority -1.0 註冊 OCR 增強 converter）</pre>
+
+<h2>模組結構速查</h2>
+<div class="file-tree">packages/markitdown/
+├── src/markitdown/
+│   ├── __main__.py            CLI（argparse）
+│   ├── _markitdown.py         MarkItDown 類別（核心）
+│   ├── _base_converter.py     DocumentConverter / DocumentConverterResult
+│   ├── _stream_info.py        StreamInfo
+│   ├── _uri_utils.py          data:/file: URI 解析
+│   ├── _exceptions.py         例外層
+│   ├── converters/            22 個內建轉換器
+│   │   ├── _plain_text_converter.py
+│   │   ├── _html_converter.py / _markdownify.py
+│   │   ├── _pdf_converter.py
+│   │   ├── _docx_converter.py
+│   │   ├── _xlsx_converter.py
+│   │   ├── _pptx_converter.py
+│   │   ├── _image_converter.py / _llm_caption.py / _exiftool.py
+│   │   ├── _audio_converter.py / _transcribe_audio.py
+│   │   ├── _zip_converter.py / _epub_converter.py / _outlook_msg_converter.py
+│   │   ├── _csv_converter.py / _ipynb_converter.py
+│   │   ├── _rss_converter.py / _wikipedia_converter.py / _youtube_converter.py / _bing_serp_converter.py
+│   │   └── _doc_intel_converter.py / _cu_converter.py（Azure）
+│   └── converter_utils/docx/  OMML 數學前處理（latex_dict.py / omml.py）
+└── tests/                     測試</div>
+
+<h2>設計要點</h2>
+<ul>
+  <li><strong>策略模式</strong>：converter 是可插拔策略，內建/外掛都走同一協定。</li>
+  <li><strong>依賴延後</strong>：每個格式的第三方函式庫放在 extras，沒裝只是「該格式不支援」，不影響其他格式。</li>
+  <li><strong>寬進嚴出</strong>：型別猜測給多個線索依序嘗試，converter 失敗容錯，最後才統一報錯。</li>
+</ul>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

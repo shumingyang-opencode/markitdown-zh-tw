@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<title>markitdown-mcp · MarkItDown 繁中教學站</title>
+<meta name="description" content="markitdown-mcp——STDIO / Streamable HTTP / SSE 三種傳輸、單一工具 convert_to_markdown(uri)、Docker、Claude Desktop、安全限制。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 文件教學</a></div>
+<header>
+  <h1>markitdown-mcp</h1>
+  <div class="subtitle">把 MarkItDown 包成 MCP Server：一個工具 <code>convert_to_markdown(uri)</code> 接上任何 MCP agent</div>
+</header>
+
+<div class="guide">
+
+<div class="callout warn"><strong>重要</strong>：markitdown-mcp 設計給<strong>本機、受信任的 agent</strong>使用。
+以 Streamable HTTP / SSE 啟動時預設只綁 <code>localhost</code>，不對外網曝露——請勿自行綁到其他介面，
+除非你了解<a href="#security">安全後果</a>。</div>
+
+<h2>安裝與啟動</h2>
+<pre>pip install markitdown-mcp
+
+# STDIO（預設，最適合 MCP client）
+markitdown-mcp
+
+# Streamable HTTP（綁本機）
+markitdown-mcp --http --host 127.0.0.1 --port 3001</pre>
+
+<h2>單一工具：convert_to_markdown(uri)</h2>
+<p>參數 <code>uri</code> 可以是任何 <code>http:</code>、<code>https:</code>、<code>file:</code>、<code>data:</code> URI——與核心的 <code>convert_uri()</code> 一致。</p>
+
+<h2>Docker 啟動</h2>
+<pre>docker build -t markitdown-mcp:latest .
+docker run -it --rm markitdown-mcp:latest
+
+# 存取本機檔案：掛載目錄
+docker run -it --rm -v /home/user/data:/workdir markitdown-mcp:latest</pre>
+
+<h2>接上 Claude Desktop</h2>
+<pre>// claude_desktop_config.json
+{
+  "mcpServers": {
+    "markitdown": {
+      "command": "docker",
+      "args": ["run", "--rm", "-i", "markitdown-mcp:latest"]
+    }
+  }
+}</pre>
+<p>要讀本機目錄就加掛載：<code>"args": ["run", "--rm", "-i", "-v", "/home/user/data:/workdir", "markitdown-mcp:latest"]</code>。</p>
+
+<h2>Debug 用 MCP Inspector</h2>
+<pre>npx @modelcontextprotocol/inspector</pre>
+<ul>
+  <li>STDIO：transport 選 STDIO，command 填 <code>markitdown-mcp</code> → Connect。</li>
+  <li>Streamable HTTP：URL 填 <code>http://127.0.0.1:3001/mcp</code> → Connect。</li>
+  <li>SSE：URL 填 <code>http://127.0.0.1:3001/sse</code> → Connect。</li>
+  <li>Tools 頁籤 → List Tools → 對任意有效 URI 執行 <code>convert_to_markdown</code>。</li>
+</ul>
+
+<h2 id="security">安全考量</h2>
+<ul>
+  <li>伺服器<strong>不支援認證</strong>，以執行者的權限運作。</li>
+  <li>HTTP/SSE 預設綁 <code>localhost</code>，但同機任何程序/使用者仍可呼叫。</li>
+  <li><code>convert_to_markdown</code> 能讀伺服器使用者可讀的<strong>任何檔案</strong>、以及<strong>任何網路上</strong>的資料。</li>
+  <li>需要更高安全時：放進 VM / 容器沙箱，限制使用者權限；<strong>絕對不要綁到非 localhost 介面</strong>。</li>
+</ul>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<title>程式碼對照 · _base_converter.py · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 程式碼對照——_base_converter.py 的 DocumentConverter 協定逐函數講解。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>_base_converter.py — Converter 協定</h1>
+  <div class="subtitle">所有轉換器的「接口契約」：DocumentConverter + DocumentConverterResult</div>
+  <div class="badge-line">檔案：<code>packages/markitdown/src/markitdown/_base_converter.py</code>（105 行）</div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p>這 105 行定義了整個系統的「最小公約數」：任何「能把檔案變成 Markdown」的東西都叫
+<code>DocumentConverter</code>，任何轉換結果都是 <code>DocumentConverterResult</code>。
+兩個方法的簽名刻意一致，保證 <code>accepts()</code> 回 True 時 <code>convert()</code> 一定能處理。</p>
+
+<hr>
+
+<h2>1. DocumentConverterResult（結果物件）</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">DocumentConverterResult.__init__(markdown, *, title=None)</span> <span class="fn-tag">結果</span><span class="fn-one-liner">唯一必填是 Markdown 字串；title 可選。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p><code>title</code> 為 keyword-only、可選——目前只有部分 converter（如 EPUB）會填。
+未來新增中繼資料只需加欄位，不破壞既有呼叫。</p></div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">text_content（property + setter）</span> <span class="fn-tag">軟棄用</span><span class="fn-one-liner">markdown 的別名，向後相容舊程式碼。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>docstring 明說「soft-deprecated」，新程式碼請用 <code>markdown</code> 或 <code>__str__</code>。
+<code>__str__</code> 直接回傳 markdown——所以 <code>print(result)</code> 就是印 Markdown。</p></div>
+</div>
+</details>
+
+<h2>2. DocumentConverter（抽象父類）</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">DocumentConverter.accepts(file_stream, stream_info, **kwargs) -&gt; bool</span> <span class="fn-tag">協定</span><span class="fn-one-liner">快速判斷「該不該由我轉」。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>判定的主要依據依序：<code>stream_info.mimetype</code>、<code>stream_info.extension</code>；
+HTTP 抓來的會看 <code>stream_info.url</code>（Wikipedia/YouTube 就是靠 URL 判斷）；
+甚至可看 <code>filename</code>（如 Dockerfile/Makefile 這種知名檔名）。</p>
+<div class="anno-para"><strong>陷阱提醒（官方註解）</strong>：像 OutlookMsgConverter 這種必須「偷讀」串流才能判斷的
+converter，<strong>讀完必須把位置 seek 回去</strong>——因為緊接著 convert() 會從原位置開始讀。</div>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">DocumentConverter.convert(file_stream, stream_info, **kwargs) -&gt; DocumentConverterResult</span> <span class="fn-tag">協定</span><span class="fn-one-liner">把檔案流讀成 Markdown 結果。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>接受 <code>seek/tell/read</code> 的 file-like 物件 + StreamInfo + 全域 kwargs。
+可拋：<code>FileConversionException</code>（型別認得但轉失敗）、<code>MissingDependencyException</code>
+（缺依賴）。兩個方法都是 <code>NotImplementedError</code>，強迫子類實作。</p></div>
+</div>
+</details>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

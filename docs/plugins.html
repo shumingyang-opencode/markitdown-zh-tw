@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<title>外掛系統 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 外掛系統——entry-point 群組、enable_plugins、markitdown-ocr、sample-plugin 外掛開發教學。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 文件教學</a></div>
+<header>
+  <h1>外掛系統</h1>
+  <div class="subtitle">MarkItDown 用 Python entry-point 讓第三方擴充「安裝即註冊」，預設關閉</div>
+</header>
+
+<div class="guide">
+
+<h2>運作方式</h2>
+<ol>
+  <li>外掛套件在 <code>pyproject.toml</code> 宣告 entry-point：<code>[project.entry-points."markitdown.plugin"]</code>。</li>
+  <li>套件匯出 <code>__plugin_interface_version__</code> 與 <code>register_converters(markitdown, **kwargs)</code>。</li>
+  <li>每次建立 <code>MarkItDown</code> 實例時，若 <code>enable_plugins=True</code>（或 CLI <code>--use-plugins</code>），
+      會 <code>entry_points(group="markitdown.plugin")</code> 載入全部已安裝外掛，呼叫 <code>register_converters()</code>。</li>
+  <li>外掛可用 <code>register_converter(converter, priority=...)</code> 在任何優先級插入 converter——包括搶在內建 converter 之前。</li>
+</ol>
+
+<h2>外掛預設關閉</h2>
+<pre># 列出已安裝外掛
+markitdown --list-plugins
+
+# 使用外掛
+markitdown --use-plugins path-to-file.pdf
+
+# Python API
+md = MarkItDown(enable_plugins=True)
+result = md.convert("path-to-file.rtf")</pre>
+
+<div class="callout warn"><strong>注意</strong>：外掛載入失敗（entry_point.load() 拋例外）不會中斷，
+只會 <code>warn()</code> 並跳過——所以裝了外掛但沒生效時，先檢查 <code>--list-plugins</code>。</div>
+
+<h2>官方外掛：markitdown-ocr</h2>
+<p>用 <strong>LLM Vision</strong> 抽取 PDF、DOCX、PPTX、XLSX 中「內嵌圖片」的文字（OCR），
+不需要新 ML 函式庫——沿用核心既有的 <code>llm_client / llm_model</code> 模式。</p>
+<pre>pip install markitdown-ocr
+pip install openai
+
+markitdown document.pdf --use-plugins --llm-client openai --llm-model gpt-4o</pre>
+<p>重點行為：</p>
+<ul>
+  <li>四個 OCR 增強 converter 以 <strong>priority -1.0</strong> 註冊——在內建（0.0）之前。</li>
+  <li>掃描版 PDF（無文字層）自動整頁渲染 300 DPI 送 LLM。</li>
+  <li>OCR 區塊包成 <code>*[Image OCR]...&lt;文字&gt;[End OCR]*</code>，就地插入不破壞文件流程。</li>
+  <li>沒有 <code>llm_client</code> 時外掛仍載入但「靜默略過」，退回內建 converter。</li>
+</ul>
+
+<h2>自己寫外掛：markitdown-sample-plugin 範本</h2>
+<p>以 RtfConverter 為例，三步完成：</p>
+<pre># 1. 實作 DocumentConverter
+class RtfConverter(DocumentConverter):
+    def accepts(self, file_stream, stream_info, **kwargs) -&gt; bool:
+        ...  # 判斷是不是 RTF
+    def convert(self, file_stream, stream_info, **kwargs) -&gt; DocumentConverterResult:
+        ...  # 轉成 Markdown
+
+# 2. 匯出外掛協定
+__plugin_interface_version__ = 1
+
+def register_converters(markitdown: MarkItDown, **kwargs):
+    markitdown.register_converter(RtfConverter())
+
+# 3. pyproject.toml 宣告 entry-point
+# [project.entry-points."markitdown.plugin"]
+# sample_plugin = "markitdown_sample_plugin"</pre>
+<p>完整註解範例見 <a href="code/ocr.html">程式碼對照 · OCR / 外掛套件</a>。</p>
+
+<div class="callout info"><strong>找外掛</strong>：在 GitHub 搜尋 <code>#markitdown-plugin</code> 標籤可找到社群外掛。</div>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

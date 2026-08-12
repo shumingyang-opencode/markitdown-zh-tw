@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<title>MarkItDown 繁中教學站 · markitdown-zh-tw</title>
+<meta name="description" content="MarkItDown（Microsoft，MIT）的非官方繁體中文教學站——程式碼對照、轉換器全覽、CLI/API、外掛、MCP、Azure 與真實轉換案例。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="index.html">首頁</a>
+  <a href="map.html">概念地圖</a>
+  <a href="learning-path.html">學習路線</a>
+  <a href="install.html">安裝指南</a>
+  <a href="docs/index.html">文件教學</a>
+  <a href="docs/code/index.html">程式碼對照</a>
+  <a href="docs/worked.html">實作案例</a>
+  <a href="about.html">關於</a>
+</nav>
+<header>
+  <h1>MarkItDown 繁體中文教學站</h1>
+  <div class="subtitle">把整個 repo（程式碼 · 轉換器 · CLI · 外掛 · MCP · Azure）做成中英對照的解說</div>
+  <div class="tagline">
+    <strong>MarkItDown</strong> 是微軟 AutoGen 團隊出品的開源 Python 工具：用一個指令把
+    <strong>PDF、PowerPoint、Word、Excel、圖片、音訊、HTML、CSV、ZIP、YouTube、EPUB</strong>
+    等檔案轉成 <strong>Markdown</strong>，供 LLM 與文字分析管線直接使用——
+    保留標題、清單、表格、連結等文件結構。
+  </div>
+</header>
+
+<div class="entry-cards">
+  <a class="entry-card" href="map.html">
+    <span class="ec-icon">🕸️</span>
+    <span class="ec-title">概念地圖</span>
+    <span class="ec-en">Concept Map</span>
+    <span class="ec-desc">converter、priority、StreamInfo、magika、accepts/convert、plugin、entry-point——一張圖看懂轉換管線的所有核心概念。</span>
+  </a>
+  <a class="entry-card" href="learning-path.html">
+    <span class="ec-icon">🧗</span>
+    <span class="ec-title">學習路線</span>
+    <span class="ec-en">Learning Path</span>
+    <span class="ec-desc">從安裝到讀源碼的分層路線：L0 裝好、L1 跑起來、L2 玩轉格式、L3 讀原理、L4 讀源碼。</span>
+  </a>
+  <a class="entry-card" href="install.html">
+    <span class="ec-icon">📦</span>
+    <span class="ec-en">Install Guide</span>
+    <span class="ec-title">安裝指南</span>
+    <span class="ec-desc">pip extras 表、uv、conda、source、Docker、markitdown-mcp / markitdown-ocr、疑難排解。</span>
+  </a>
+  <a class="entry-card" href="docs/index.html">
+    <span class="ec-icon">📚</span>
+    <span class="ec-title">文件教學</span>
+    <span class="ec-en">Documentation</span>
+    <span class="ec-desc">翻譯並解說官方文件：運作原理、架構、轉換器總覽、CLI、Python API、外掛、MCP、Azure、安全。</span>
+  </a>
+  <a class="entry-card" href="docs/code/index.html">
+    <span class="ec-icon">🧩</span>
+    <span class="ec-title">程式碼對照</span>
+    <span class="ec-en">Code Walkthrough</span>
+    <span class="ec-desc">MarkItDown 類別、CLI、converter 介面、Office/PDF/Web/Media 轉換器、外掛與 MCP 套件逐函數講解。</span>
+  </a>
+  <a class="entry-card" href="docs/worked.html">
+    <span class="ec-icon">🎮</span>
+    <span class="ec-en">Worked Examples</span>
+    <span class="ec-title">實作案例</span>
+    <span class="ec-desc">11 種格式的真實轉換輸出（本站實跑），外加用 graphify 掃描 MarkItDown 自己的互動知識圖譜。</span>
+  </a>
+</div>
+
+<div class="sync-panel"><h2>上游同步 · 版本釘選</h2><div class="sync-meta">對齊上游 <code>microsoft/markitdown</code> 分支 <code>main</code>（<code>fd239d5</code>）<span class="sync-badge ok">已釘選</span></div><p class="sync-empty">上游為 MIT 授權，本站內容逐月檢查並更新對齊版本（.github/workflows/check-upstream.yml）。</p></div>
+
+<div class="embed-panel">
+  <div class="embed-head"><span class="embed-title">專案資料</span><span class="repo-status">來源：microsoft/markitdown（MIT）</span></div>
+  <div class="repo-readme">
+    <ul>
+      <li><strong>官方 repo</strong>：<a href="https://github.com/microsoft/markitdown">github.com/microsoft/markitdown</a>（分支 main，授權 MIT）</li>
+      <li><strong>PyPI 套件</strong>：<code>markitdown</code>（核心）、<code>markitdown-mcp</code>（MCP Server）、<code>markitdown-ocr</code>（OCR 外掛）、<code>markitdown-sample-plugin</code>（外掛範本）</li>
+      <li><strong>官方定位</strong>：與 <a href="https://github.com/deanmalmgren/textract">textract</a> 同類，但聚焦「保留文件結構（heading/table/link）」與「輸出為 Markdown」</li>
+      <li><strong>支援格式</strong>：PDF、PPTX、DOCX、XLSX/XLS、圖片（EXIF + OCR）、音訊（EXIF + 轉錄）、HTML、CSV/JSON/XML、ZIP、YouTube、EPUB、RSS、Outlook .msg、iPython notebook…</li>
+      <li><strong>整合</strong>：Azure Document Intelligence、Azure Content Understanding、LLM Vision（圖片描述/OCR）、Docker、MCP（STDIO/HTTP/SSE）</li>
+    </ul>
+  </div>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站——中文解說為本站撰寫，英文原文與程式碼保留上游原貌。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關，為第三方社群教學站 · 由 OpenCode 建置</div>
+  <div class="footer-license">授權檔案：<a href="LICENSE">MIT LICENSE</a> · <a href="NOTICE">NOTICE</a></div>
+</footer>
+</div>
+</body>
+</html>

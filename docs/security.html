@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<title>安全模型 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 安全模型——I/O 權限等同目前程序、Sanitize inputs、只用最窄的 convert_* 函數、MCP 安全。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 文件教學</a></div>
+<header>
+  <h1>安全模型</h1>
+  <div class="subtitle">MarkItDown 的 I/O 權限等同目前程序——請像對待 open() / requests.get() 一樣謹慎</div>
+</header>
+
+<div class="guide">
+
+<div class="callout warn"><strong>核心風險</strong>：MarkItDown 以<strong>目前程序的權限</strong>執行 I/O。
+它會存取「程序本身能存取」的資源——這和 <code>open()</code>、<code>requests.get()</code> 一樣。
+在不信任的環境中，輸入必須先驗證與限制。</div>
+
+<h2>三條安全守則</h2>
+
+<h3>1. Sanitize inputs（消毒輸入）</h3>
+<p>不要把不受信任的輸入直接丟給 MarkItDown。在代管 / 伺服器應用中，任何可能受使用者控制的輸入，
+都必須先驗證與限制，例如：</p>
+<ul>
+  <li>限制檔案路徑範圍（擋掉絕對路徑、<code>..</code> 穿越）</li>
+  <li>限制 URI scheme 與網路目的地</li>
+  <li>封鎖私有、loopback、link-local、metadata-service 位址（如 <code>169.254.169.254</code>）</li>
+</ul>
+
+<h3>2. 呼叫最窄的 convert_* 函數</h3>
+<p><code>convert()</code> 故意很寬鬆：可吃本機檔、遠端 URI、bytes 流。請依用途收窄：</p>
+<table>
+  <tr><th>你的需求</th><th>該用</th></tr>
+  <tr><td>只讀本機檔案</td><td><code>convert_local()</code></td></tr>
+  <tr><td>自己控制 URI 抓取（proxy/驗證/快取）</td><td>自己 <code>requests.get()</code> → <code>convert_response()</code></td></tr>
+  <tr><td>最大控制權</td><td>自己 open stream → <code>convert_stream()</code></td></tr>
+</table>
+
+<h3>3. 信任你的 converter</h3>
+<p>第三方外掛的 <code>convert()</code> 會以你的權限執行任意程式碼——只安裝信任來源的外掛。
+<code>accepts()</code> 也一樣是外部程式碼。</p>
+
+<h2>markitdown-mcp 的額外風險面</h2>
+<ul>
+  <li>伺服器<strong>無認證</strong>，以執行者權限運作。</li>
+  <li>HTTP/SSE 預設綁 <code>localhost</code>，但同機其他程序仍可呼叫。</li>
+  <li><code>convert_to_markdown</code> 能讀伺服器使用者可讀的任何檔案 + 任何網路資料。</li>
+  <li>需要更高安全：放進 VM/容器沙箱、限制使用者權限；<strong>不要綁到非 localhost 介面</strong>。</li>
+</ul>
+
+<h2>官方原文</h2>
+<details class="en-toggle">
+<summary>English original — Security Considerations</summary>
+<div>
+<blockquote>MarkItDown performs I/O with the privileges of the current process. Like <code>open()</code> or
+<code>requests.get()</code>, it will access resources that the process itself can access.</blockquote>
+<blockquote>Do not pass untrusted input directly to MarkItDown. If any part of the input may be controlled
+by an untrusted user or system, such as in hosted or server-side applications, it must be validated and
+restricted before calling MarkItDown. Depending on your environment, this may include restricting file
+paths, limiting URI schemes and network destinations, and blocking access to private, loopback, link-local,
+or metadata-service addresses.</blockquote>
+<blockquote>Prefer the narrowest conversion API that fits your use case. MarkItDown's <code>convert()</code>
+method is intentionally permissive and can handle local files, remote URIs, and byte streams. If your
+application only needs to read local files, call <code>convert_local()</code> instead. If you need more
+control over URI fetching, call <code>requests.get()</code> yourself and pass the response object to
+<code>convert_response()</code>. For maximum control, open a stream to the input you want converted and call
+<code>convert_stream()</code>.</blockquote>
+</div>
+</details>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

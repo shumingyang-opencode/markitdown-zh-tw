@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<title>程式碼對照 · Azure 雲端轉換器 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 程式碼對照——_doc_intel_converter.py 與 _cu_converter.py 的 analyzer 路由與型別偵測。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>_doc_intel / _cu — Azure 雲端轉換器</h1>
+  <div class="subtitle">兩條雲端路徑：Document Intelligence 版面分析、Content Understanding 多模態</div>
+  <div class="badge-line">檔案：<code>_doc_intel_converter.py</code> · <code>_cu_converter.py</code>（Cloud 整合源碼）</div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p>兩個 converter 都是「有端點才註冊」（<code>enable_builtins</code> 只在提供
+<code>docintel_endpoint</code>/<code>cu_endpoint</code> 時加入，且插到堆疊頂端）。
+最複雜的是 <strong>Content Understanding 的 analyzer 路由</strong>：依檔案型別自動選 analyzer、
+處理模態相容性、輸出 YAML front matter。</p>
+
+<hr>
+
+<h2>1. DocumentIntelligenceConverter</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">DocumentIntelligenceFileType / accepts / _analysis_features / convert</span> <span class="fn-tag">DocIntel</span><span class="fn-one-liner">雲端版面分析；依檔型別選 analysis features。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p><code>DocumentIntelligenceFileType</code> 是字串列舉（PDF/JPEG/PNG/DOCX…）；
+<code>_get_mime_type_prefixes</code>/<code>_get_file_extensions</code> 從列舉產生 accepts 規則。
+<code>_analysis_features</code> 依檔型別挑 OCR/table 等 features；<code>convert</code> 呼叫
+<code>azure-ai-documentintelligence</code> client 分析並組 Markdown。</p>
+</div>
+</div>
+</details>
+
+<h2>2. ContentUnderstandingConverter（analyzer 路由核心）</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">ContentUnderstandingFileType / _detect_file_type / _detect_file_type_from_mime</span> <span class="fn-tag">CU</span><span class="fn-one-liner">依副檔名或 MIME 偵測 CU 支援的檔案型別。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p><code>ContentUnderstandingFileType</code> 列舉（PDF/JPEG/PNG/MP3/MP4/WAV…）與模態對應；
+<code>_clean_mime_type</code>/<code>_canonical_mime_type</code> 正規化 MIME，
+<code>_content_type_for</code> 決定送給 CU API 的 content-type。</p></div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">_get_modality / _resolve_analyzer_modality / _is_analyzer_compatible</span> <span class="fn-tag">CU</span><span class="fn-one-liner">分析器模態快取、解析與相容性檢查。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>零設定時要「自動選 analyzer」：<code>_get_modality</code> 把檔案型別歸成 document/image/audio/video；
+<code>_resolve_analyzer_modality</code> 用快取或呼叫 <code>get_analyzer()</code> 查 analyzer 的模態；
+<code>_is_analyzer_compatible</code> 判斷「文件 analyzer 能否處理音訊」。不相容就自動退回預建 analyzer。</p></div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">convert / to_llm_input</span> <span class="fn-tag">CU</span><span class="fn-one-liner">呼叫 CU API 並把結構化欄位序列化成 YAML front matter。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p><code>convert</code> 用 analyzer 結果組 Markdown：欄位（vendor、日期…）放在
+<code>---</code> YAML front matter，正文逐頁 <code>&lt;!-- page N --&gt;</code>。
+<code>to_llm_input</code> 是 <code>azure-ai-contentunderstanding&gt;=1.2.0b1</code> 提供的 helper，
+把結果轉成可直接餵 LLM 的格式（所以 extra 才要求 <code>&gt;=1.2.0b1</code>）。</p></div>
+</div>
+</details>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

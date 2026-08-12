@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<title>實作案例 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 實作案例——本站用 markitdown 0.1.7 實跑的 11 種格式真實轉換，加上 graphify 掃描 MarkItDown 自己的互動知識圖譜。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 文件教學</a></div>
+<header>
+  <h1>實作案例</h1>
+  <div class="subtitle">真實工具產出，不是示意圖——本站用 markitdown 0.1.7 實跑 + graphify 掃描 MarkItDown 自己</div>
+  <div class="badge-line">版本釘選：上游 main @ fd239d5（v0.1.7）· markitdown[all] 於本機 uv venv 執行</div>
+</header>
+
+<div class="case-grid">
+  <a class="case-card" href="case/office.html">
+    <span class="cc-name">Office：DOCX / XLSX / PPTX</span>
+    <span class="cc-en">sample-report.docx · sales-data.xlsx · pitch-deck.pptx</span>
+    <span class="cc-desc">Word 標題/清單/表格、Excel 工作表、PowerPoint 投影片分頁的實際轉換輸出。</span>
+  </a>
+  <a class="case-card" href="case/pdf-web.html">
+    <span class="cc-name">PDF + 網頁/網址</span>
+    <span class="cc-en">report.pdf · example.html · data.csv · data.json</span>
+    <span class="cc-desc">PDF（中文+表格）、HTML、CSV、JSON 的輸出結構與限制。</span>
+  </a>
+  <a class="case-card" href="case/media-archive.html">
+    <span class="cc-name">媒體 + 封裝</span>
+    <span class="cc-en">photo.jpg · tone.wav · archive.zip · book.epub</span>
+    <span class="cc-desc">圖片 EXIF、音訊轉錄失敗的真實錯誤、ZIP 逐檔、EPUB 中繼資料。</span>
+  </a>
+  <a class="case-card" href="case/dogfood.html">
+    <span class="cc-name">Dogfood：MarkItDown 轉 MarkItDown 自己</span>
+    <span class="cc-en">README · pyproject.toml · Dockerfile · GitHub 頁 · PyPI 頁</span>
+    <span class="cc-desc">用工具轉自己的 repo 檔案與網頁——「用轉換工具分析轉換工具」的 meta 示範。</span>
+  </a>
+  <a class="case-card" href="case/markitdown-source.html">
+    <span class="cc-name">graphify 掃描 MarkItDown 源碼</span>
+    <span class="cc-en">907 nodes · 1967 edges · 71 communities</span>
+    <span class="cc-desc">用知識圖譜工具分析轉換工具：可操作的互動知識圖譜（EN/ZH 雙版本）。</span>
+  </a>
+</div>
+
+<div class="embed-panel">
+  <div class="embed-head"><span class="embed-title">案例資產位置</span><span class="repo-status">worked/</span></div>
+  <div class="repo-readme">
+    <ul>
+      <li><code>worked/conversions/</code> — 11 種格式的輸入樣本檔 + 轉換輸出 + <code>README.md</code>（含全部指令）</li>
+      <li><code>worked/dogfood/</code> — MarkItDown 轉自己（README / pyproject / Dockerfile / GitHub 頁 / PyPI 頁）</li>
+      <li><code>worked/markitdown-source/</code> — graphify 互動圖（graph.html / graph-zh.html）+ GRAPH_REPORT.md</li>
+    </ul>
+  </div>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

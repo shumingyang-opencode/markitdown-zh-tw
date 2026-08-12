@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<title>程式碼對照 · Office 轉換器 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 程式碼對照——docx/xlsx/pptx 轉換器與 converter_utils/docx 的 OMML→LaTeX 前處理。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>docx / xlsx / pptx — Office 轉換器</h1>
+  <div class="subtitle">mammoth 管線、OMML→LaTeX、pandas 表格、python-pptx 圖片/表格</div>
+  <div class="badge-line">檔案：<code>_docx_converter.py</code> · <code>_xlsx_converter.py</code> · <code>_pptx_converter.py</code> · <code>converter_utils/docx/</code></div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p>三個 Office 格式走完全不同路線：<strong>DOCX</strong> 先經 mammoth 轉 HTML 再進
+<code>_markdownify</code>；<strong>XLSX</strong> 用 pandas 讀表；<strong>PPTX</strong> 用
+python-pptx 走版面物件。最精彩的是 <code>converter_utils/docx</code>——把 Word 的 OMML 數學轉成 LaTeX。</p>
+
+<hr>
+
+<h2>1. DocxConverter（繼承 HtmlConverter）</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">__init__ / accepts / convert</span> <span class="fn-tag">DOCX</span><span class="fn-one-liner">mammoth 把 .docx 轉 HTML → HtmlConverter 轉 Markdown。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>constructor 先跑 <code>pre_process_docx()</code>（把 OMML 數學換成 LaTeX 佔位），
+再叫 mammoth 轉 HTML，最後用繼承自 HtmlConverter 的 <code>_markdownify</code> 轉 Markdown。
+docstring：標題與表格盡可能保留。</p></div>
+</div>
+</details>
+
+<h2>2. converter_utils/docx — OMML 數學前處理</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">pre_process_docx(input_docx) / _pre_process_math / _convert_omath_to_latex / _get_omath_tag_replacement</span> <span class="fn-tag">converter_utils</span><span class="fn-one-liner">DOCX 的 XML 中把 <code>&lt;m:oMath&gt;</code> 轉成 LaTeX 佔位。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>docx 是 zip，內含 <code>word/document.xml</code>。流程：解壓 → 用 BeautifulSoup 掃 XML → 找到
+<code>oMath</code> 元素 → 用 <code>oMath2Latex</code> 轉成 <code>$$...$$</code> LaTeX →
+再打包回 docx。因為 mammoth 本身不認得 OMML，<strong>先換成文字再進 mammoth 是唯一出路</strong>。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">oMath2Latex / Tag2Method / Pr</span> <span class="fn-tag">math/omml.py</span><span class="fn-one-liner">OMML XML → LaTeX 的直譯器。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>這是個「標籤分派」直譯器：<code>Tag2Method</code> 依 XML tag 名呼叫對應方法
+（<code>do_sub/do_sup/do_rad/do_f/do_nary/do_acc/do_bar/do_lim/do_eqarr/do_mr</code>…）。
+<code>oMath2Latex</code> 負責整體轉換；<code>Pr</code> 處理數學屬性（樣式）。graphify 掃描顯示
+<code>oMath2Latex</code> 是全圖第六大 god node（31 邊）——這是「分數/根號/上下標」轉換的功臣。</p></div>
+</div>
+</details>
+
+<h2>3. XlsxConverter / XlsConverter</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">__init__ / accepts / convert</span> <span class="fn-tag">XLSX</span><span class="fn-one-liner">pandas 讀每張表，輸出 <code>## 表名</code> + Markdown 表格。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>用 <code>pandas.read_excel(engine="openpyxl"/"xlrd")</code> 讀所有 sheet，每個 sheet
+輸出標題 + 表頭 + 資料列。注意：pandas 會把整張表的內容（含合併列、註解文字）都帶進表格，
+並以 <code>NaN</code> 呈現空值——這是「誠實但可能不像人寫」的輸出（見案例頁觀察）。</p></div>
+</div>
+</details>
+
+<h2>4. PptxConverter</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">convert / _is_picture / _is_table / _get_image_info / _convert_table_to_markdown / _convert_chart_to_markdown / _find_svg_blip_part</span> <span class="fn-tag">PPTX</span><span class="fn-one-liner">逐投影片走版面物件，輸出標題/清單/表格/圖片 alt。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>對每張 slide 的每個 shape 分派：</p>
+<ul>
+  <li><code>_is_picture</code> — 圖片 shape → 輸出 <code>![alt](image)</code>（可配 llm_caption）。</li>
+  <li><code>_is_table</code> — 表格 shape → <code>_convert_table_to_markdown</code>。</li>
+  <li>圖表 shape → <code>_convert_chart_to_markdown</code>。</li>
+  <li><code>_find_svg_blip_part</code> — 處理 <code>&lt;asvg:svgBlip&gt;</code> 的 SVG 圖片（避免 raster 依賴）。</li>
+</ul>
+<p>每個 slide 開頭輸出 <code>&lt;!-- Slide number: N --&gt;</code> 註解。</p>
+</div>
+</div>
+</details>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

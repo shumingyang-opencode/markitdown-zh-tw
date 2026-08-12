@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<title>程式碼對照 · OCR 外掛套件 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 程式碼對照——markitdown-ocr（LLMVisionOCRService）與 markitdown-sample-plugin（RtfConverter 開發範本）。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>markitdown-ocr + markitdown-sample-plugin</h1>
+  <div class="subtitle">外掛生態的兩個代表：真 OCR 外掛 + 開發範本</div>
+  <div class="badge-line">檔案：<code>packages/markitdown-ocr/src/</code> · <code>packages/markitdown-sample-plugin/src/</code></div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p><code>markitdown-ocr</code> 用 <strong>LLM Vision</strong> 對 PDF/DOCX/PPTX/XLSX 內嵌圖片做 OCR，
+並以 <strong>priority -1.0</strong> 註冊在內建之前「攔截」；<code>markitdown-sample-plugin</code>
+是官方最小範本，教你三步寫外掛。</p>
+
+<hr>
+
+<h2>1. markitdown-ocr：外掛入口</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">register_converters(markitdown, **kwargs)</span> <span class="fn-tag">_plugin.py</span><span class="fn-one-liner">建 LLMVisionOCRService 並以 priority -1.0 註冊 4 個 OCR converter。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>從 kwargs 取出 <code>llm_client / llm_model / llm_prompt</code> 建 service；
+沒有 <code>llm_client</code> 就回傳空 service（OCR 會靜默略過）。四個 converter
+（<code>PdfConverterWithOCR</code> 等）用 <code>register_converter(priority=-1.0)</code>
+註冊——<strong>-1.0 &lt; 內建的 0.0</strong>，所以先被試到，等同覆寫內建。</p></div>
+</div>
+</details>
+
+<h2>2. LLMVisionOCRService（OCR 服務層）</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">OCRResult / LLMVisionOCRService.__init__ / extract_text</span> <span class="fn-tag">_ocr_service.py</span><span class="fn-one-liner">把圖片 base64 → OpenAI 相容 vision 呼叫 → 回傳文字。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p><code>OCRResult</code> 是 <code>dataclass</code>（text + confidence 等）；
+<code>extract_text</code> 組圖像 <code>content</code> 送 LLM，回傳抽取文字。整個外掛
+「不新增 ML 函式庫」的承諾就建立在這裡——全部靠既有的 OpenAI 相容 client。</p></div>
+</div>
+</details>
+
+<h2>3. 各格式 OCR 增強 converter</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">PdfConverterWithOCR</span> <span class="fn-tag">_pdf_converter_with_ocr.py</span><span class="fn-one-liner">抽取頁面內嵌圖片逐張 OCR，就地插回文字流。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><ul>
+  <li><code>_extract_images_from_page(page)</code> — 依 pdfplumber page XObjects/位置抽圖。</li>
+  <li><code>_extract_page_images</code> — 依頁索引抽圖。</li>
+  <li><code>_ocr_full_pages</code> — 掃描版 PDF 偵測（無文字層）時整頁渲染 300 DPI 送 LLM。</li>
+  <li><code>convert</code> — 正常文字 + 內嵌圖片的 OCR 文字<strong>依垂直閱讀順序交錯</strong>。</li>
+</ul>
+<p>輸出以 <code>*[Image OCR]...&lt;text&gt;[End OCR]*</code> 包住，並用 PyMuPDF 重試 malformed PDF。</p></div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">DocxConverterWithOCR</span> <span class="fn-tag">_docx_converter_with_ocr.py</span><span class="fn-one-liner">在 DOCX→HTML→Markdown 管線前注入 OCR 佔位。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p><code>_extract_and_ocr_images</code> 用 <code>doc.part.rels</code> 抽圖並 OCR；
+<code>_inject_placeholders</code> 把結果換成佔位 token 塞進 HTML，等 mammoth/markdownify
+跑完再還原成 <code>*[Image OCR]...</code> 區塊——避免 markdown 轉換器把 OCR 標記轉義掉。</p></div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">PptxConverterWithOCR / XlsxConverterWithOCR</span> <span class="fn-tag">OCR 增強</span><span class="fn-one-liner">PPTX 依形狀順序 OCR（描述優先、OCR 兜底）；XLSX 依錨點座標列圖片。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>PPTX 支援 picture shape、placeholder 內圖片、群組內圖片，且「先問 LLM 描述、無描述才 OCR」；
+XLSX 用 <code>_extract_and_ocr_sheet_images</code> + <code>_column_number_to_letter</code>
+把圖片的錨點座標換成 Excel 欄位名，輸出 <code>### Images in this sheet:</code> 段落。</p></div>
+</div>
+</details>
+
+<h2>4. markitdown-sample-plugin（開發範本）</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">__plugin_interface_version__ / register_converters / RtfConverter</span> <span class="fn-tag">_plugin.py</span><span class="fn-one-liner">RTF converter 的最小完整範例。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>三步就是全部：</p>
+<ul>
+  <li><code>RtfConverter(DocumentConverter)</code> — 實作 <code>accepts</code>（判斷 RTF）+ <code>convert</code>（轉 Markdown）。</li>
+  <li><code>__plugin_interface_version__ = 1</code> — 宣告外掛介面版本（目前只支援 1）。</li>
+  <li><code>register_converters(markitdown, **kwargs)</code> — <code>markitdown.register_converter(RtfConverter())</code>。</li>
+</ul>
+<p>最後在 <code>pyproject.toml</code> 宣告 entry-point：<code>[project.entry-points."markitdown.plugin"] sample_plugin = "markitdown_sample_plugin"</code>。裝好後 <code>markitdown --list-plugins</code> 就看得到。</p>
+</div>
+</div>
+</details>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

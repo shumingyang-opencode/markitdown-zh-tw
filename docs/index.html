@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<title>文件教學 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 文件教學入口——運作原理、架構、轉換器總覽、CLI、Python API、外掛、MCP、Azure、安全。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../index.html">首頁</a>
+  <a href="../map.html">概念地圖</a>
+  <a href="../learning-path.html">學習路線</a>
+  <a href="../install.html">安裝指南</a>
+  <a href="index.html">文件教學</a>
+  <a href="code/index.html">程式碼對照</a>
+  <a href="worked.html">實作案例</a>
+  <a href="../about.html">關於</a>
+</nav>
+<header>
+  <h1>文件教學</h1>
+  <div class="subtitle">把官方文件翻成中英對照的解說——策展式教學，不逐檔鏡像</div>
+  <div class="badge-line">語料來源：根目錄 README.md（360 行）· packages/markitdown/README.md · markitdown-mcp/README.md · markitdown-ocr/README.md · markitdown-sample-plugin/README.md</div>
+</header>
+
+<div class="entry-cards">
+  <a class="entry-card" href="how-it-works.html">
+    <span class="ec-icon">⚙️</span>
+    <span class="ec-title">運作原理</span>
+    <span class="ec-en">How It Works</span>
+    <span class="ec-desc">convert() 調度管線：StreamInfo 猜測 → magika 內容偵測 → priority 排序 → accepts → convert → 輸出標準化。</span>
+  </a>
+  <a class="entry-card" href="architecture.html">
+    <span class="ec-icon">🏗️</span>
+    <span class="ec-title">架構總覽</span>
+    <span class="ec-en">Architecture</span>
+    <span class="ec-desc">4 個套件 + 核心類別職責表：MarkItDown、DocumentConverter、ConverterRegistration、StreamInfo。</span>
+  </a>
+  <a class="entry-card" href="converters.html">
+    <span class="ec-icon">🧩</span>
+    <span class="ec-title">轉換器全覽</span>
+    <span class="ec-en">Converters</span>
+    <span class="ec-desc">22 個轉換器逐一解說：格式、依賴、priority、輸出結構、限制。</span>
+  </a>
+  <a class="entry-card" href="cli.html">
+    <span class="ec-icon">⌨️</span>
+    <span class="ec-en">CLI Reference</span>
+    <span class="ec-title">CLI 指令參考</span>
+    <span class="ec-desc">markitdown 全部旗標：-o / -x / -m / -c / -d / --use-cu / -p / --list-plugins…</span>
+  </a>
+  <a class="entry-card" href="python-api.html">
+    <span class="ec-icon">🐍</span>
+    <span class="ec-en">Python API</span>
+    <span class="ec-title">Python API</span>
+    <span class="ec-desc">5 個 convert_* 方法、StreamInfo 線索卡、DocumentConverterResult 回傳值。</span>
+  </a>
+  <a class="entry-card" href="plugins.html">
+    <span class="ec-icon">🔌</span>
+    <span class="ec-en">Plugins</span>
+    <span class="ec-title">外掛系統</span>
+    <span class="ec-desc">entry-point 群組、enable_plugins、markitdown-ocr、sample-plugin 開發教學。</span>
+  </a>
+  <a class="entry-card" href="mcp.html">
+    <span class="ec-icon">🔗</span>
+    <span class="ec-en">MCP Server</span>
+    <span class="ec-title">markitdown-mcp</span>
+    <span class="ec-desc">STDIO / Streamable HTTP / SSE 三種傳輸、Docker、Claude Desktop、安全限制。</span>
+  </a>
+  <a class="entry-card" href="cloud.html">
+    <span class="ec-icon">☁️</span>
+    <span class="ec-en">Azure Cloud</span>
+    <span class="ec-title">Azure 雲端轉換</span>
+    <span class="ec-desc">Document Intelligence vs Content Understanding 對照表 + 計費注意。</span>
+  </a>
+  <a class="entry-card" href="docker.html">
+    <span class="ec-icon">🐳</span>
+    <span class="ec-en">Docker</span>
+    <span class="ec-title">Docker</span>
+    <span class="ec-desc">建映像、stdin 管道轉換、mcp Docker 啟動。</span>
+  </a>
+  <a class="entry-card" href="security.html">
+    <span class="ec-icon">🛡️</span>
+    <span class="ec-en">Security</span>
+    <span class="ec-title">安全模型</span>
+    <span class="ec-desc">I/O 權限等同目前程序、Sanitize inputs、只用最窄的 convert_* 函數。</span>
+  </a>
+  <a class="entry-card" href="worked.html">
+    <span class="ec-icon">🎮</span>
+    <span class="ec-en">Worked Examples</span>
+    <span class="ec-title">實作案例</span>
+    <span class="ec-desc">11 種格式真實轉換 + graphify 互動圖——真實工具產出的示範。</span>
+  </a>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

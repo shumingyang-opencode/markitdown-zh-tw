@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<title>概念地圖 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 概念地圖——converter、priority、StreamInfo、magika、plugin、MCP、Azure 等核心概念一次看懂。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="index.html">首頁</a>
+  <a href="map.html">概念地圖</a>
+  <a href="learning-path.html">學習路線</a>
+  <a href="install.html">安裝指南</a>
+  <a href="docs/index.html">文件教學</a>
+  <a href="docs/code/index.html">程式碼對照</a>
+  <a href="docs/worked.html">實作案例</a>
+  <a href="about.html">關於</a>
+</nav>
+<header>
+  <h1>概念地圖</h1>
+  <div class="subtitle">converter · priority · StreamInfo · magika · plugin——一張圖看懂 MarkItDown 的運作骨架</div>
+</header>
+
+<div class="concept-map">
+
+  <div class="cm-row">
+    <a class="cm-node on-ramp" href="docs/code/core.html">
+      <span class="label">MarkItDown</span>
+      <span class="tag">核心入口類別：註冊 converter、調度轉換、5 個 convert_* 方法</span>
+      <span class="pill">_markitdown.py</span>
+    </a>
+    <span class="cm-arrow">→</span>
+    <a class="cm-node on-ramp" href="docs/how-it-works.html">
+      <span class="label">調度管線</span>
+      <span class="tag">猜測類型 → 排序 → accepts → convert → 輸出標準化</span>
+    </a>
+  </div>
+
+  <div class="cm-row">
+    <a class="cm-node service" href="docs/code/base.html">
+      <span class="label">DocumentConverter</span>
+      <span class="tag">所有轉換器的抽象父類：accepts() 判斷 + convert() 轉換</span>
+      <span class="pill">_base_converter.py</span>
+    </a>
+    <a class="cm-node service" href="docs/code/base.html">
+      <span class="label">DocumentConverterResult</span>
+      <span class="tag">轉換結果：markdown / text_content / title</span>
+    </a>
+    <a class="cm-node service" href="docs/code/converters.html">
+      <span class="label">accepts()</span>
+      <span class="tag">用 StreamInfo（mimetype/extension）決定是否接單</span>
+    </a>
+    <a class="cm-node service" href="docs/code/converters.html">
+      <span class="label">convert()</span>
+      <span class="tag">把檔案流讀成 Markdown 字串</span>
+    </a>
+  </div>
+
+  <div class="cm-row">
+    <a class="cm-node on-ramp" href="docs/code/core.html">
+      <span class="label">ConverterRegistration</span>
+      <span class="tag">converter + priority 的註冊資料</span>
+    </a>
+    <span class="cm-arrow">→</span>
+    <a class="cm-node on-ramp" href="docs/code/core.html">
+      <span class="label">priority</span>
+      <span class="tag">越小越先試；特定格式 0.0，通用兜底 10.0</span>
+    </a>
+    <span class="cm-arrow">→</span>
+    <a class="cm-node on-ramp" href="docs/code/core.html">
+      <span class="label">register_converter()</span>
+      <span class="tag">把自訂/外掛 converter 插入調度鏈</span>
+    </a>
+  </div>
+
+  <div class="cm-row">
+    <a class="cm-node standalone" href="docs/code/stream-info.html">
+      <span class="label">StreamInfo</span>
+      <span class="tag">mimetype / extension / charset / filename / url——轉換的「線索卡」</span>
+      <span class="pill">_stream_info.py</span>
+    </a>
+    <a class="cm-node standalone" href="docs/code/stream-info.html">
+      <span class="label">magika</span>
+      <span class="tag">Google 的內容型別偵測模型：直接讀位元組猜型別</span>
+    </a>
+    <a class="cm-node standalone" href="docs/code/stream-info.html">
+      <span class="label">charset-normalizer</span>
+      <span class="tag">文字檔編碼猜測</span>
+    </a>
+    <a class="cm-node standalone" href="docs/code/stream-info.html">
+      <span class="label">data:/file:/http: URI</span>
+      <span class="tag">convert_uri() 支援的 4 種 URI scheme</span>
+    </a>
+  </div>
+
+  <div class="cm-row">
+    <a class="cm-node service" href="docs/converters.html">
+      <span class="label">Office 家族</span>
+      <span class="tag">DOCX（含 OMML 數學）· XLSX/XLS · PPTX</span>
+    </a>
+    <a class="cm-node service" href="docs/converters.html">
+      <span class="label">PDF / 網頁</span>
+      <span class="tag">pdfminer+pdfplumber · HTML · RSS · Wikipedia · YouTube</span>
+    </a>
+    <a class="cm-node service" href="docs/converters.html">
+      <span class="label">Media 家族</span>
+      <span class="tag">圖片（EXIF+LLM 描述）· 音訊（EXIF+轉錄）</span>
+    </a>
+    <a class="cm-node service" href="docs/converters.html">
+      <span class="label">文字/封裝</span>
+      <span class="tag">PlainText · CSV · JSON · iPython · ZIP · EPUB · Outlook .msg</span>
+    </a>
+  </div>
+
+  <div class="cm-row">
+    <a class="cm-node standalone" href="docs/plugins.html">
+      <span class="label">entry-point 群組</span>
+      <span class="tag">markitdown.plugin：安裝即註冊，預設關閉</span>
+    </a>
+    <span class="cm-arrow">→</span>
+    <a class="cm-node standalone" href="docs/plugins.html">
+      <span class="label">enable_plugins()</span>
+      <span class="tag">enable_plugins=True / --use-plugins 開啟</span>
+    </a>
+    <span class="cm-arrow">→</span>
+    <a class="cm-node meta" href="docs/code/ocr.html">
+      <span class="label">markitdown-ocr</span>
+      <span class="tag">LLM Vision OCR：PDF/DOCX/PPTX/XLSX 內嵌圖片轉文字</span>
+    </a>
+    <a class="cm-node meta" href="docs/code/ocr.html">
+      <span class="label">markitdown-sample-plugin</span>
+      <span class="tag">外掛開發範本：RtfConverter + register_converters</span>
+    </a>  </div>
+
+  <div class="cm-row">
+    <a class="cm-node standalone" href="docs/cloud.html">
+      <span class="label">Azure Document Intelligence</span>
+      <span class="tag">雲端版面分析，-d / docintel_endpoint</span>
+    </a>
+    <a class="cm-node standalone" href="docs/cloud.html">
+      <span class="label">Azure Content Understanding</span>
+      <span class="tag">多模態 + 結構化欄位（YAML front matter），--use-cu</span>
+    </a>
+    <a class="cm-node standalone" href="docs/mcp.html">
+      <span class="label">markitdown-mcp</span>
+      <span class="tag">MCP Server：convert_to_markdown(uri)，STDIO/HTTP/SSE</span>
+    </a>
+    <a class="cm-node standalone" href="docs/docker.html">
+      <span class="label">Docker</span>
+      <span class="tag">docker run -i markitdown < file.pdf > out.md</span>
+    </a>
+  </div>
+
+  <div class="cm-caption">節點依賴方向大致由上而下：入口 → 協定 → 調度 → 型別猜測 → 轉換器家族 → 外掛/雲端/MCP。</div>
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站——中文解說為本站撰寫，英文原文與程式碼保留上游原貌。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

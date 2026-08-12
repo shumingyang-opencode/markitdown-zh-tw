@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<title>案例：Office 轉換 · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 真實轉換案例——Word/Excel/PowerPoint 三種 Office 格式的實際輸出。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="../code/index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="../worked.html">← 實作案例</a></div>
+<header>
+  <h1>案例：Office 轉換</h1>
+  <div class="subtitle">DOCX / XLSX / PPTX——真實工具輸出，本站實跑</div>
+  <div class="badge-line">markitdown 0.1.7 · 對齊 fd239d5 · 輸入樣本由 scripts/generate-samples.py 產生</div>
+</header>
+
+<div class="guide">
+
+<h2>1. Word（sample-report.docx）</h2>
+<p>輸入含：標題、段落、項目符號、3×3 表格。轉換後標題保留為 <code>#</code>/<code>##</code>、
+項目符號變 <code>*</code>、表格變 Markdown 表格。注意表格第一行「標題列」被當成表頭以外的資料列。</p>
+<pre>MarkItDown 測試文件
+
+這是一份用來示範 MarkItDown 轉換的 Word 文件。包含標題、段落、項目符號與表格，轉換後應保留結構。
+
+# 第一個章節
+
+段落文字：markitdown 會保留 heading、list 與 table 等結構。
+
+## 功能清單
+
+* PDF 轉換
+* Word 轉換
+* Excel 轉換
+* 簡報轉換
+* 圖片/音訊
+
+## 版本比較表
+
+|  |  |  |
+| --- | --- | --- |
+| 功能 | markitdown | textract |
+| PDF | ✅ | ✅ |
+| DOCX | ✅ | ✅ |</pre>
+<pre class="src">markitdown worked/conversions/office/sample-report.docx -o worked/conversions/office/sample-report.md</pre>
+
+<h2>2. Excel（sales-data.xlsx）</h2>
+<p>每個工作表輸出 <code>## 工作表名</code> + Markdown 表格。觀察點：合併列（Total）與
+「註：」那行被併入表格且多出 <code>NaN</code>——這是 pandas 讀整張表的誠實結果。</p>
+<pre>## Sales
+| Region | Product | Units | Revenue |
+| --- | --- | --- | --- |
+| North | Widget | 120.0 | 2400.0 |
+| North | Gadget | 80.0 | 3200.0 |
+| South | Widget | 150.0 | 3000.0 |
+| South | Gadget | 60.0 | 2400.0 |
+| East | Widget | 90.0 | 1800.0 |
+| Total | NaN | 500.0 | 12800.0 |
+| 註：此為樣本資料，用於示範 Excel → Markdown 的表格保留。| NaN | NaN | NaN |</pre>
+<pre class="src">markitdown worked/conversions/office/sales-data.xlsx -o worked/conversions/office/sales-data.md</pre>
+
+<h2>3. PowerPoint（pitch-deck.pptx）</h2>
+<p>每張投影片輸出 <code>&lt;!-- Slide number: N --&gt;</code> 註解分頁 + 標題 + 項目 + 表格。
+方便追蹤「這一段來自第幾頁」。</p>
+<pre>&lt;!-- Slide number: 1 --&gt;
+# MarkItDown 簡報範例
+示範 PowerPoint 轉 Markdown
+作者：markitdown-zh-tw
+
+&lt;!-- Slide number: 2 --&gt;
+# 為什麼用 Markdown？
+對 LLM 友善
+token 效率高
+保留文件結構
+
+&lt;!-- Slide number: 3 --&gt;
+# 支援格式一覽
+| 格式 | 狀態 |
+| --- | --- |
+| PDF | ✅ |
+| DOCX | ✅ |
+| XLSX | ✅ |</pre>
+<pre class="src">markitdown worked/conversions/office/pitch-deck.pptx -o worked/conversions/office/pitch-deck.md</pre>
+
+<div class="callout info"><strong>本站觀察</strong>：Office 三種格式的輸出品質都不錯——標題、清單、表格都能保留。
+實務上若要更高保真（例如複雜 Word 數學公式），DOCX 家族另有 <code>converter_utils/docx</code> 的 OMML→LaTeX
+前處理（見<a href="../code/office.html">程式碼對照</a>）。</div>
+
+<h2>重現方式</h2>
+<pre># 產生樣本檔（本機需 python-docx / openpyxl / python-pptx）
+python scripts/generate-samples.py
+
+# 轉換
+markitdown worked/conversions/office/sample-report.docx -o worked/conversions/office/sample-report.md
+markitdown worked/conversions/office/sales-data.xlsx  -o worked/conversions/office/sales-data.md
+markitdown worked/conversions/office/pitch-deck.pptx  -o worked/conversions/office/pitch-deck.md</pre>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

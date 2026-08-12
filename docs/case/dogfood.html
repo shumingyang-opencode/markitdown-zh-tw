@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<title>案例：Dogfood · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown dogfood 案例——用 MarkItDown 轉換 MarkItDown 自己的 README、pyproject.toml、Dockerfile、GitHub 頁、PyPI 頁。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="../code/index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="../worked.html">← 實作案例</a></div>
+<header>
+  <h1>案例：Dogfood——MarkItDown 轉 MarkItDown 自己</h1>
+  <div class="subtitle">用轉換工具分析轉換工具：README / pyproject.toml / Dockerfile / GitHub 頁 / PyPI 頁</div>
+  <div class="badge-line">markitdown 0.1.7 · 對齊 fd239d5 · 全部本站實跑</div>
+</header>
+
+<div class="guide">
+
+<h2>為什麼 dogfood？</h2>
+<p>「用你自己的工具處理你自己的 repo」是最誠實的測試。以下全部輸出都收在 <code>worked/dogfood/</code>。</p>
+
+<h2>1. README.md（透過 raw URL，餵對齊 commit）</h2>
+<p>輸入已是 Markdown，輸出幾乎原封不動（16 KB）。這也展示 <code>convert_uri</code> 直接抓網址的能力：</p>
+<pre class="src">markitdown "https://raw.githubusercontent.com/microsoft/markitdown/fd239d5d2be43d9b68329730206b9312c7d5a388/README.md" -o readme.md</pre>
+<p class="hint">輸出 16,115 bytes，內容與上游 README 一致（標題、徽章、表格都保留）。</p>
+
+<h2>2. pyproject.toml（本機源碼）</h2>
+<p>TOML 是純文字 → <code>PlainTextConverter</code>，原文原樣保留（這正好讓你看清 extras 的真實定義）：</p>
+<pre>[project]
+name = "markitdown"
+description = 'Utility tool for converting various files to Markdown'
+requires-python = "&gt;=3.10"
+license = "MIT"
+
+[project.optional-dependencies]
+all = [ "python-pptx", "mammoth~=1.11.0", "pandas", ..., "SpeechRecognition", "youtube-transcript-api~=1.0.0", ... ]
+pdf = ["pdfminer.six&gt;=20251230", "pdfplumber&gt;=0.11.9"]
+docx = ["mammoth~=1.11.0", "lxml"]
+audio-transcription = ["pydub", "SpeechRecognition"]
+youtube-transcription = ["youtube-transcript-api"]</pre>
+<pre class="src">markitdown D:\temp\opencode\markitdown\packages\markitdown\pyproject.toml -o pyproject.md</pre>
+
+<h2>3. Dockerfile</h2>
+<p>純文字，原樣保留。</p>
+<pre class="src">markitdown D:\temp\opencode\markitdown\Dockerfile -o dockerfile.md</pre>
+<p class="hint">輸出 717 bytes。</p>
+
+<h2>4. GitHub 專案頁（HTML）——含雜訊的誠實示範</h2>
+<p>直接把 <code>https://github.com/microsoft/markitdown</code> 丟進去。GitHub 頁有超多導覽列，
+而 GitHub 頁「沒有專用 converter」→ 走通用 <code>HtmlConverter</code>，於是一大堆導覽連結也被轉進來（26 KB）。</p>
+<pre>[Skip to content](#start-of-content)
+
+## Navigation Menu
+
+[Sign in](/login?...)
+
+* Platform
+  + AI CODE CREATION
+    - [GitHub CopilotWrite better code with AI](https://github.com/features/copilot)
+  + DEVELOPER WORKFLOWS
+    - [ActionsAutomate any workflow](https://github.com/features/actions)
+  ...</pre>
+<div class="callout info"><strong>教學點</strong>：這正是「為什麼某些網站有專用 converter」的理由——
+Wikipedia、YouTube、RSS 都有專門 converter 來「只取正文」；對沒有專用 converter 的一般網頁，
+輸出的雜訊多寡取決於該頁面的導覽結構。</div>
+
+<h2>5. PyPI 套件頁（HTML）</h2>
+<p>同樣是通用 HTML 轉換，導覽/警示區塊也進來了（16 KB）。</p>
+<pre>[Skip to main content](#content)
+Switch to mobile version
+
+Warning
+Some features may not work without JavaScript. Please try enabling it if you encounter problems.
+
+[![PyPI](/static/images/logo-small.0e0855d0.svg)](/)
+
+Search PyPI ...</pre>
+
+<h2>6. 源碼本身（_markitdown.py）</h2>
+<p>Python 源碼 → PlainText，原樣保留（32 KB）。等於「用 MarkItDown 備份自己的源碼」。</p>
+<pre class="src">markitdown D:\temp\opencode\markitdown\packages\markitdown\src\markitdown\_markitdown.py -o core-source.md</pre>
+
+<h2>本站結論</h2>
+<ul>
+  <li>對「已是文字/Markdown」的輸入，輸出近乎無損。</li>
+  <li>對「結構化網頁」，通用 HTML 轉換會帶入導覽雜訊——需要正文時請自己先抓正文或選用專用 converter。</li>
+</ul>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>

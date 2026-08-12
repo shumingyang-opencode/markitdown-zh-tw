@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<title>程式碼對照 · _markitdown.py · MarkItDown 繁中教學站</title>
+<meta name="description" content="MarkItDown 程式碼對照——_markitdown.py 的 MarkItDown 類別逐函數講解。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="container">
+<nav class="topnav">
+  <a href="../../index.html">首頁</a>
+  <a href="../../map.html">概念地圖</a>
+  <a href="../../learning-path.html">學習路線</a>
+  <a href="../../install.html">安裝指南</a>
+  <a href="../index.html">文件教學</a>
+  <a href="index.html">程式碼對照</a>
+  <a href="../worked.html">實作案例</a>
+  <a href="../../about.html">關於</a>
+</nav>
+<div class="back-link"><a href="index.html">← 程式碼對照</a></div>
+<header>
+  <h1>_markitdown.py — MarkItDown 類別</h1>
+  <div class="subtitle">整條調度管線的「總電源開關」：註冊、猜型別、排序、轉換</div>
+  <div class="badge-line">檔案：<code>packages/markitdown/src/markitdown/_markitdown.py</code>（806 行）</div>
+</header>
+
+<div class="guide">
+
+<h2>大方向</h2>
+<p><code>_markitdown.py</code> 定義 <code>MarkItDown</code> 類別與 <code>ConverterRegistration</code>。
+關鍵設計：<strong>5 個 convert_* 方法全部最終匯流到同一個 <code>_convert()</code></strong>——
+先猜出「這個檔案可能是什麼」的 StreamInfo 清單，再依 priority 依序嘗試每個 converter，直到有人成功。
+開頭兩個模組級常數定義優先級：特定格式 <code>0.0</code>、通用兜底 <code>10.0</code>。</p>
+
+<hr>
+
+<h2>1. 模組級：常數與外掛載入</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">PRIORITY_SPECIFIC_FILE_FORMAT / PRIORITY_GENERIC_FILE_FORMAT</span> <span class="fn-tag">常數</span><span class="fn-one-liner">優先級基準：越小越先試。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>特定格式（docx/pdf/xlsx…）都給 <code>0.0</code>；「近乎兜底」的
+<code>PlainTextConverter / HtmlConverter / ZipConverter</code> 給 <code>10.0</code>。
+註冊順序的註解寫得很明確：<strong>「越特定的 converter 要放在越通用之下」</strong>。</p></div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">_load_plugins()</span> <span class="fn-tag">module</span><span class="fn-one-liner">Lazy 載入 entry-point 群組 markitdown.plugin 的全部外掛。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>用模組級全域 <code>_plugins</code> 記快取，第一次呼叫才真的
+<code>entry_points(group="markitdown.plugin")</code>。單一外掛 <code>load()</code> 拋例外時
+只 <code>warn()</code> 並跳過，不會中斷——這是「外掛壞了不影響主程式」的設計。</p></div>
+</div>
+</details>
+
+<h2>2. 建構與註冊</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">MarkItDown.__init__(*, enable_builtins=None, enable_plugins=None, **kwargs)</span> <span class="fn-tag">核心</span><span class="fn-one-liner">建 requests session、magika 實例，依旗標註冊內建/外掛 converter。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>三件事：</p>
+<ul>
+  <li><strong>requests session</strong>：預設帶 <code>Accept: text/markdown, text/html;q=0.9...</code>，
+      伺服器支援時會直接回 Markdown。</li>
+  <li><strong>magika</strong>：<code>magika.Magika()</code> 一次初始化，供型別猜測。</li>
+  <li><strong>註冊</strong>：<code>enable_builtins</code> 預設 <code>None→True</code> 註冊內建；
+      <code>enable_plugins</code> 預設關閉。</li>
+</ul>
+<div class="anno-para"><strong>教學重點</strong>：參數全走 keyword-only（<code>*</code>），避免位置參數錯位。</div>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">enable_builtins(**kwargs)</span> <span class="fn-tag">一次</span><span class="fn-one-liner">註冊 22 個內建 converter + 可選的 Azure 雲端 converter。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>先解析全域選項（<code>llm_client / llm_model / llm_prompt / exiftool_path / style_map</code>），
+<code>exiftool_path</code> 依序來自 kwargs → <code>EXIFTOOL_PATH</code> 環境變數 → 白名單路徑
+（/usr/bin、C:\Program Files…）搜尋。然後依註冊順序 <code>register_converter(...)</code> 加 22 個內建；
+若提供 <code>docintel_endpoint</code> / <code>cu_endpoint</code>，再把對應 Azure converter
+<strong>插到堆疊頂端</strong>（最優先）。重複呼叫會 <code>warn()</code>。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">enable_plugins(**kwargs)</span> <span class="fn-tag">一次</span><span class="fn-one-liner">載入全部外掛並把 kwargs 轉交 register_converters()。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>呼叫 <code>_load_plugins()</code>，對每個 plugin 執行
+<code>plugin.register_converters(self, **kwargs)</code>——這就是外掛拿到
+<code>llm_client / llm_model</code> 等全域選項的方式。</p></div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">register_converter(converter, *, priority=0.0)</span> <span class="fn-tag">API</span><span class="fn-one-liner">插入註冊清單頂端；後註冊者優先。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p><code>self._converters.insert(0, ConverterRegistration(...))</code>。
+因為「後註冊者在前」+ 穩定排序，同優先級時最後註冊的最先試——外掛可以藉此覆蓋內建。
+<code>register_page_converter()</code> 是棄用別名，僅 <code>warn()</code>。</p></div>
+</div>
+</details>
+
+<h2>3. 5 個 convert_* 方法（全部匯流到 _convert）</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">convert(source, *, stream_info=None, **kwargs)</span> <span class="fn-tag">入口</span><span class="fn-one-liner">依輸入型別自動分派：str/Path/Response/BinaryIO。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>最通用的入口：<code>str</code> 以 <code>http:/https:/file:/data:</code> 前綴判斷走
+<code>convert_uri</code> 或 <code>convert_local</code>；<code>Path</code> → local；
+<code>requests.Response</code> → response；有 <code>.read()</code> 的 bytes 流 → stream。
+否則拋 <code>TypeError</code>。legacy <code>url=</code> kwarg 會被改名成 <code>mock_url</code>。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">convert_local(path, *, stream_info=None, file_extension=None, url=None, **kwargs)</span> <span class="fn-tag">本機</span><span class="fn-one-liner">最窄 API：只吃本機檔案路徑。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>以副檔名 + 檔名建 <code>base_guess</code>，用 kwargs/stream_info 補強，open 成 bytes 流後
+<code>_get_stream_info_guesses()</code> 猜測 → <code>_convert()</code>。安全文件建議「只讀本機檔就用這個」。</p></div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">convert_stream(stream, *, stream_info=None, ...)</span> <span class="fn-tag">bytes 流</span><span class="fn-one-liner">處理不可 seek 的串流（先灌進 BytesIO）。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>不可 <code>seek()</code> 的串流會先讀成 <code>BytesIO</code> buffer 再 <code>seek(0)</code>，
+確保 magika 能重複讀取。</p></div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">convert_uri(uri, *, stream_info=None, mock_url=None, ...)</span> <span class="fn-tag">URI</span><span class="fn-one-liner">處理 file: / data: / http: / https: 四種 scheme。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<ul>
+  <li><code>file:</code> → <code>file_uri_to_path</code> 解出 path；netloc 非空且非 localhost 會 <code>ValueError</code>。</li>
+  <li><code>data:</code> → <code>parse_data_uri</code> 解出 mimetype + bytes → convert_stream。</li>
+  <li><code>http(s):</code> → 用 session 抓（<code>raise_for_status()</code>）→ convert_response。</li>
+</ul>
+<p><code>convert_url()</code> 是它的別名（未來可能棄用）。</p>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">convert_response(response, *, stream_info=None, ...)</span> <span class="fn-tag">HTTP</span><span class="fn-one-liner">從 response headers + URL 湊出線索，讀進 BytesIO 再轉換。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>從 <code>content-type</code> 拆 mimetype + charset，從 <code>content-disposition</code> 的
+<code>filename=</code> 或 URL path 的副檔名湊出 extension，組 <code>base_guess</code> 後轉換。
+這讓「自己控制 HTTP 抓取」成為可能。</p></div>
+</div>
+</details>
+
+<h2>4. 調度核心 _convert</h2>
+
+<details class="fn-block" open>
+<summary><span class="fn-name">_convert(*, file_stream, stream_info_guesses, **kwargs)</span> <span class="fn-tag">核心</span><span class="fn-one-liner">依 priority 排序 converters，逐一試 accepts→convert，標準化輸出。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<p>流程（每個 guess × 每個 converter）：</p>
+<ul>
+  <li>每次 <code>sorted(self._converters, key=lambda x: x.priority)</code>——priority 可能變動故每次重排。</li>
+  <li>先 <code>converter.accepts(...)</code>，<code>NotImplementedError</code> 視為不接受。</li>
+  <li>接受後 <code>converter.convert(...)</code>；拋例外 → 記 <code>FailedConversionAttempt</code>，<code>finally</code> 把 stream 跳回原位。</li>
+  <li>成功後<strong>標準化</strong>：每行 <code>rstrip()</code> + <code>\n{3,}</code> 壓成 <code>\n\n</code>，回傳。</li>
+</ul>
+<p>全部失敗：有失敗紀錄 → <code>FileConversionException(attempts)</code>；沒人接受 →
+<code>UnsupportedFormatException</code>。</p>
+<div class="anno-para"><strong>教學重點</strong>：全域選項（llm_client/llm_model/llm_prompt/style_map/exiftool_path）
+在 <code>_convert</code> 裡「複製進 kwargs」傳給每個 converter——所以 CLI 的 <code>--llm-client</code> 能下推到所有 converter。</div>
+</div>
+</div>
+</details>
+
+<h2>5. 型別猜測</h2>
+
+<details class="fn-block">
+<summary><span class="fn-name">_get_stream_info_guesses(file_stream, base_guess)</span> <span class="fn-tag">核心</span><span class="fn-one-liner">用 mimetypes + magika + charset-normalizer 產出多個 StreamInfo 線索。</span></summary>
+<div class="fn-body">
+<div class="fn-zh">
+<ul>
+  <li>有副檔名無 mimetype → <code>mimetypes.guess_type</code> 補；反之互補。</li>
+  <li><code>magika.identify_stream()</code> 讀位元組猜型別，文字類再讀前 4KB 用
+      <code>charset_normalizer</code> 猜編碼。</li>
+  <li>magika 猜測與 base_guess<strong>相容</strong> → 合併成一個 guess；<strong>衝突</strong> → 兩個 guess 都放，依序嘗試。</li>
+</ul>
+</div>
+</div>
+</details>
+
+<details class="fn-block">
+<summary><span class="fn-name">_normalize_charset(charset)</span> <span class="fn-tag">工具</span><span class="fn-one-liner">用 codecs.lookup 把編碼名正規化成 canonical 形式。</span></summary>
+<div class="fn-body">
+<div class="fn-zh"><p>避免「utf-8」vs「UTF-8」vs「utf8」的比對陷阱；查不到就原樣回傳。</p></div>
+</div>
+</details>
+
+</div>
+
+<footer>
+  <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
+  <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+</footer>
+</div>
+</body>
+</html>
