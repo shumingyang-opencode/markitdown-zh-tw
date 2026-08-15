@@ -197,3 +197,4 @@ python -m http.server 8000   # 本機預覽
 - PyPI：`markitdown` · `markitdown-mcp` · `markitdown-ocr` · `markitdown-sample-plugin`
 - 本站 repo：[shumingyang-opencode/markitdown-zh-tw](https://github.com/shumingyang-opencode/markitdown-zh-tw)
 - 本站上線：[shumingyang-opencode.github.io/markitdown-zh-tw](https://shumingyang-opencode.github.io/markitdown-zh-tw/)
+- 學習路徑建議服務：[learning-path-advisor](https://shuming-yang.github.io/learning-path-advisor/) — 依角色推薦教學網站學習路徑
