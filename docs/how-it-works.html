@@ -174,6 +174,73 @@ except Exception as e:
   <li>用 <code>StreamInfo</code> 手動提示副檔名，測試 stdin 場景下的格式偵測。</li>
 </ol>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>① 進階真實情境：批次 PDF 轉換 + 品質驗證 + CI 管線</h2>
+<p>場景：公司每天新增 2000 份報價單 PDF，要轉成 Markdown 餵給 RAG 檢索。
+「轉換完就信任」是最大的坑——掃描版 PDF 會「成功」回傳空字串，必須先驗證品質再進檢索索引。</p>
+<pre>from pathlib import Path
+from markitdown import MarkItDown
+from markitdown._exceptions import FileConversionException, UnsupportedFormatException
+
+md = MarkItDown()
+ok, empty, failed = [], [], []
+
+for pdf in Path("invoices/").glob("*.pdf"):
+    try:
+        text = md.convert_local(str(pdf)).markdown      # 最窄 API，安全守則
+        (ok if len(text.strip()) &gt;= 50 else empty).append(pdf.name)  # 字數閘
+    except (FileConversionException, UnsupportedFormatException) as e:
+        failed.append((pdf.name, type(e).__name__))
+
+print(f"OK {len(ok)} / empty {len(empty)} / failed {len(failed)}")
+# empty 清單幾乎都是掃描版 PDF——轉換「成功」但內容是空的</pre>
+<p>批次中把例外<strong>分類收集</strong>而不直接中斷，才能一次跑完 2000 份再統一處理。
+品質閘（字數門檻）之所以必要，是因為 <code>_convert()</code> 的容錯鏈設計——
+converter 失敗會被接住並繼續試下一個，失敗不一定會拋到你面前。</p>
+<pre># 整合進 CI：回歸守門員
+# scripts/convert_invoices.py 跑完後輸出品質統計
+# 若 OK 比例低於門檻 → 讓 CI 失敗，阻止壞資料進索引
+def quality_gate(ok_count, total, threshold=0.95):
+    if ok_count / total &lt; threshold:
+        raise SystemExit("品質回歸！轉換成功率低於門檻")</pre>
+<p><strong>為什麼選這條路徑</strong>：<code>convert_local()</code> 是最窄、可重現的入口（符合<a href="security.html">安全守則</a>）；
+用字數閘捕捉「假成功」；用例外分類讓 2000 份的批次可除錯；最後用 CI 門檻把品質變成可量測的守門員。</p>
+
+<h2>② 深入原理擴充：HTML→Markdown 引擎與「假成功」</h2>
+<p>所有「HTML 家族」converter（<code>HtmlConverter</code> 及其繼承者 <code>DocxConverter</code>、<code>EpubConverter</code>）
+都共用同一套 <code>_markdownify.py</code> 的 <code>_CustomMarkdownify</code> 引擎。它覆寫了 markdownify 的四個行為：</p>
+<ul>
+  <li><code>convert_hn</code> — 標題保留為 <code>#</code>（含 <code>lang</code> 屬性）。</li>
+  <li><code>convert_a</code> — 保留連結、移除 <code>javascript:</code> 連結、轉義 URI。</li>
+  <li><code>convert_img</code> — 圖片輸出 <code>![alt](src)</code>，處理 data URI（可截斷）。</li>
+  <li><code>convert_input</code> — checkbox 轉成 <code>[x]</code>/<code>[ ]</code>。</li>
+</ul>
+<div class="callout warn"><strong>大家以為轉換沒問題但其實丟資訊</strong><br>
+最典型的「假成功」是<strong>掃描版 PDF</strong>：pdfminer 抽不到文字層、pdfplumber 抽不到表格，
+<code>PdfConverter.convert()</code> 仍會正常回傳——只是內容幾乎是空的。沒有例外、沒有警告。
+要發現它只能靠<strong>頁數比對</strong>（pdfplumber 知道頁數、輸出卻沒內容）或字數驗證。
+這是「轉換成功 ≠ 內容完整」的最佳教材。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+  <tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+  <tr><td>轉換「成功」但輸出幾乎是空的</td><td>掃描版 PDF（無文字層）</td><td>用頁數/字數驗證；改用 Azure Content Understanding 或 OCR 外掛</td></tr>
+  <tr><td><code>FileConversionException</code> 包含多個 attempt</td><td>converter 接受了但 <code>convert()</code> 失敗</td><td>看 <code>attempts</code> 找缺哪個依賴（如 <code>pdfminer</code>）</td></tr>
+  <tr><td><code>UnsupportedFormatException</code></td><td>所有 <code>accepts()</code> 都回 False</td><td>檢查副檔名/MIME；stdin 場景加 <code>-x</code> 提示</td></tr>
+  <tr><td>輸出文字順序與視覺版面不同</td><td>pdfminer 依內容流順序抽取</td><td>用 pdfplumber 的 word 座標重組，或改用雲端版面分析</td></tr>
+  <tr><td>同一 stream 多次轉換結果不一致</td><td>converter 失敗後 stream 狀態錯亂</td><td>確認 <code>file_stream.seek(cur_pos)</code> 有被執行；非 seekable 流先包成 BytesIO</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+  <li>寫一支腳本：用 <code>convert_stream()</code> + 手動 <code>StreamInfo</code> 批次處理 100 份檔案，比較與 <code>convert_local()</code> 的結果差異，解釋原因。</li>
+  <li>故意把一個 HTML 檔改名成 <code>.pdf</code> 轉換，追蹤 magika 衝突時產生幾個 guesses、順序如何。</li>
+  <li>設計一個品質驗證函數：不只數字數，還要檢查「標題數、表格數、連結數」的結構完整性，再套進批次管線當品質閘。</li>
+</ol>
+
+</div>
+
 </footer>
 </div>
 </body>

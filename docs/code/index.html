@@ -151,6 +151,65 @@ base.html（協定）→ core.html（入口）→ converters.html（概覽）→
 
 </div>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>① 進階真實情境：用源碼追蹤一次真實轉換的完整呼叫鏈</h2>
+<p>場景：你在除錯「為什麼這個 CSV 轉出來格式怪怪的」。與其猜，不如<strong>沿著呼叫鏈從頭走到尾</strong>——
+把 <code>markitdown file.csv</code> 的每一站都標出來，找到真正負責轉換的函數。</p>
+<pre># 追蹤路徑：CLI → MarkItDown.convert → convert_local → _convert → CsvConverter
+# 1. __main__.py 解析 -x/.csv → StreamInfo
+# 2. MarkItDown.convert() 收到 "file.csv"（str，非 URL）→ convert_local()
+# 3. convert_local() 以副檔名建 base_guess → _get_stream_info_guesses()
+# 4. magika 確認 text/csv → 與 base_guess 合併成一個 guess
+# 5. _convert() 排序 converters → CsvConverter.accepts() → True
+# 6. CsvConverter.convert() → csv.Sniffer 猜分隔符 → 輸出 Markdown 表格</pre>
+<pre># 實際驗證：加一行 print 觀察優先序與猜測
+from markitdown import MarkItDown
+
+md = MarkItDown()
+# 複製 _convert 的行為：印出每個 converter 的接受與否
+for reg in sorted(md._converters, key=lambda c: c.priority):
+    print(reg.priority, reg.converter.__class__.__name__)</pre>
+<p><strong>為什麼選這條路徑</strong>：程式碼對照頁提供了<strong>地圖</strong>，但真正要動手除錯時需要<strong>沿著邊走一遍</strong>。
+把「caller → callee」的順序串起來，才能把「誰猜錯型別」「誰丟了資訊」歸因到具體函數。
+這比盲目改一行測試有效得多。</p>
+
+<h2>② 深入原理擴充：讀源碼時的三個「認知陷阱」</h2>
+<p>程式碼對照的目的不是背函數名，而是<strong>建立正確的因果模型</strong>。三個常見誤區：</p>
+<ul>
+  <li><strong>「簽名會騙人」</strong>：<code>convert(source)</code> 看起來是「一個參數」，其實內部依型別分派到四個不同路徑——
+      讀源碼不能只看簽名，要看 <code>isinstance</code> / 前綴判斷的分支。</li>
+  <li><strong>「順序假設」</strong>：<code>register_converter</code> 用 <code>insert(0, ...)</code> + 穩定排序，
+      所以「後註冊者優先」。不看呼叫順序，會誤判誰先被嘗試。</li>
+  <li><strong>「單檔誤導」</strong>：<code>_markdownify.py</code> 不只服務 HtmlConverter——
+      它是 DocxConverter、EpubConverter 的共同父類邏輯。改它的行為，會同時影響多個格式。</li>
+</ul>
+<div class="callout warn"><strong>大家以為轉換沒問題但其實丟資訊</strong><br>
+<strong>「異常處理 ≠ 轉換失敗」的誤判</strong>：<code>_convert()</code> 的 <code>except Exception</code> 會把 converter 的失敗
+記成 <code>FailedConversionAttempt</code> 後繼續試下一個。當你看到 <code>FileConversionException</code> 時，
+裡面的 <code>attempts</code> 可能是「多個 converter 都失敗」的疊加——但<strong>最後成功的可能是最後一個嘗試</strong>。
+如果你只讀第一個 attempt 就下結論，就會把「其實轉成功了」誤判成「失敗」。
+正確做法：先看有沒有人成功，再看失敗紀錄找原因。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+  <tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+  <tr><td>找不到某個函數的定義</td><td>版本不一致（本站對齊 fd239d5/v0.1.7）</td><td>確認本地版本；函數名可能在新舊版本間改名</td></tr>
+  <tr><td>改 <code>_markdownify</code> 影響了非 HTML 格式</td><td>Docx/Epub 繼承自 HtmlConverter</td><td>先畫繼承圖，確認誰共用此行為，再決定改哪裡</td></tr>
+  <tr><td>誤以為某 converter 會先被嘗試</td><td>忽略 priority 與註冊順序</td><td>印出 <code>sorted(md._converters, key=lambda c: c.priority)</code></td></tr>
+  <tr><td>錯誤訊息指向多個 converter</td><td>容錯鏈疊加多個 attempt</td><td>先確認有無成功轉換；再看 attempt 找根因</td></tr>
+  <tr><td>函數行為與文件描述不符</td><td>讀的是簽名不是分支邏輯</td><td>看 <code>isinstance</code>/前綴判斷分支；用測試或 print 驗證</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+  <li>追蹤 <code>markitdown "https://example.com"</code> 的完整呼叫鏈，標出 URL 判斷與 <code>convert_uri</code> 的分支。</li>
+  <li>在 <code>_convert()</code> 的迴圈中插入 print，印出「guess × converter → accepts → convert」的每次嘗試，跑一份真實檔案。</li>
+  <li>畫出 <code>_markdownify.py</code> 的影響範圍：哪些 converter 直接或間接繼承了它，改其中一個覆寫會影響誰。</li>
+</ol>
+
+</div>
+
 <footer>
   <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>

@@ -140,6 +140,65 @@ markitdown document.pdf --use-plugins -o out.md</pre>
   <li>用管道 <code>echo "hello" | markitdown</code> 測試 stdin 模式。</li>
 </ol>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>① 進階真實情境：批次轉換工作流 + 品質門檻 + CI 整合</h2>
+<p>場景：你要把一整個目錄（含子目錄）的 PDF 與 Office 檔批次轉成 Markdown，
+並在 CI 裡檢查「每個檔案都轉出非空結果」，失敗就讓建置失敗——避免壞轉換靜默進資料庫。</p>
+<pre># 1. 批次轉換 + 品質門檻
+#!/usr/bin/env bash
+set -euo pipefail
+FAILED=0
+find docs/ \( -name "*.pdf" -o -name "*.docx" -o -name "*.xlsx" \) -print0 |
+while IFS= read -r -d '' f; do
+  out="${f%.*}.md"
+  markitdown "$f" -o "$out" || { echo "FAIL convert: $f"; FAILED=1; continue; }
+  # 品質門檻：空輸出視為失敗（掃描 PDF 常見）
+  if [ ! -s "$out" ]; then echo "FAIL empty: $out"; FAILED=1; fi
+done
+exit $FAILED</pre>
+<pre># 2. 整合進 CI（GitHub Actions 節錄）
+- name: Convert docs to Markdown
+  run: bash scripts/batch-convert.sh
+- name: Fail on empty conversions
+  run: |
+    if grep -rl "FAIL empty" logs/; then exit 1; fi</pre>
+<p><strong>為什麼選這條路徑</strong>：CLI 比 Python API 更適合 CI——<strong>無狀態、可被 shell 工具鏈組合、
+退出碼可直接驅動建置結果</strong>。用 <code>-o</code> 指定輸出避免 stdout 混入日誌；
+用 <code>-x</code> 只在需要提示副檔名的 stdin 場景使用。</p>
+
+<h2>② 深入原理擴充：CLI 如何把旗標變成 StreamInfo 線索卡</h2>
+<p>CLI 不是把檔案丟給 API 那麼簡單——它負責<strong>把命令列旗標翻譯成 StreamInfo 線索</strong>，餵給 <code>_convert()</code>：</p>
+<ul>
+  <li><code>-x</code>：自動補上 <code>.</code> 前綴後寫進 <code>extension</code> 欄位。</li>
+  <li><code>-m</code>：寫進 <code>mimetype</code>（會驗證格式必須含 <code>/</code>）。</li>
+  <li><code>-c</code>：用 <code>codecs</code> 正規化成 canonical 編碼名（避免 <code>utf-8</code> vs <code>UTF8</code> 的比對陷阱）。</li>
+  <li>stdin 讀取時<strong>先灌進 BytesIO</strong>，確保 magika 可以重複讀位元組做內容偵測。</li>
+</ul>
+<div class="callout warn"><strong>大家以為轉換沒問題但其實丟資訊</strong><br>
+<strong>stdin + 猜錯類型</strong>是最隱蔽的資訊遺失：<code>cat file.bin | markitdown</code> 沒給 <code>-x</code>，
+magika 只能靠位元組猜。若猜成 <code>text/plain</code>，檔案會被 <code>PlainTextConverter</code> 當純文字「成功」轉出——
+不會報錯，但二進位內容變成亂碼文字，結構資訊全沒了。永遠記住：<strong>stdin 場景 + 非純文字檔 = 必加 <code>-x</code></strong>。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+  <tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+  <tr><td>stdin 轉出亂碼或空白</td><td>magika 猜錯類型，走了 PlainText</td><td>加 <code>-x .pdf</code> / <code>-m "application/pdf"</code> 提示</td></tr>
+  <tr><td><code>-d</code> 與 <code>--use-cu</code> 同時報錯</td><td>兩者互斥</td><td>只能擇一，兩條 Azure 路徑不能並存</td></tr>
+  <tr><td>輸出中文亂碼</td><td>輸入編碼偵測不準</td><td>加 <code>-c UTF-8</code> 強制編碼</td></tr>
+  <tr><td>外掛沒生效</td><td>未加 <code>-p / --use-plugins</code>（預設關閉）</td><td>加旗標；<code>--list-plugins</code> 先確認已安裝</td></tr>
+  <tr><td>圖片/音訊輸出少一段內容</td><td>缺 <code>exiftool</code> 或 LLM client</td><td>設定 <code>EXIFTOOL_PATH</code>；圖片描述需 <code>--llm-client/--llm-model</code></td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+  <li>寫一支 shell script：用 <code>find</code> 掃出所有 PDF，依檔案大小分流——大檔用 <code>-d</code> 走 Document Intelligence、小檔走內建。</li>
+  <li>測試 <code>echo -n "hello" | markitdown -x .txt -c utf-16</code> 與不加 <code>-c</code> 的差異，解釋 charset 提示如何改變轉換結果。</li>
+  <li>比較 <code>markitdown file.pdf -o out.md</code> 與 <code>markitdown file.pdf &gt; out.md</code> 的行為差異（stdout 緩衝、錯誤輸出位置）。</li>
+</ol>
+
+</div>
+
 </footer>
 </div>
 </body>

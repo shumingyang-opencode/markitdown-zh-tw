@@ -115,6 +115,67 @@ cat output.md</pre>
   <li>閱讀 dogfood 案例，理解「用工具轉自己」的 meta 示範。</li>
 </ol>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>① 進階真實情境：把案例重現自動化——從手動轉換到回歸測試</h2>
+<p>場景：案例頁的 11 種格式是你「真實輸出」的承諾。但手動重跑很容易漏——某天換了版本，
+某個輸出悄悄變了。你要把這些案例變成<strong>自動化回歸測試</strong>，每次改動都驗證。</p>
+<pre># tests/test_conversions.py（節錄）
+import subprocess, pathlib, sys
+
+CASES = [
+    ("office/sample-report.docx", "##", "#"),   # DOCX：標題結構
+    ("pdf/report.pdf",           "|",  "---"),  # PDF：表格分隔列
+    ("archive/archive.zip",      "Content from", None),
+]
+
+def test_real_conversions():
+    for rel, must_contain, must_not in CASES:
+        out = subprocess.run(
+            [sys.executable, "-m", "markitdown", f"worked/conversions/{rel}"],
+            capture_output=True, text=True,
+        ).stdout
+        assert must_contain in out, f"{rel}: missing {must_contain!r}"
+        if must_not:
+            assert must_not not in out, f"{rel}: unexpected {must_not!r}"</pre>
+<p><strong>為什麼選這條路徑</strong>：把「真實輸出」變成可斷言的契約，<strong>版本升級時立即暴露行為變化</strong>——
+這正是案例頁存在的意義。用 <code>assert</code> 檢查「該有的結構在、不該有的結構不在」，
+比肉眼比對可靠得多；搭配 <code>markitdown -v</code> 釘版本，回歸測試就是你的「行為快照」。</p>
+
+<h2>② 深入原理擴充：案例輸出背後的 converter 行為細節</h2>
+<p>案例頁的每個輸出都對應一條真實的 code path：</p>
+<ul>
+  <li><strong>PDF</strong>：pdfminer 抽文字、pdfplumber 抽表格，兩者疊加再跑 <code>_merge_partial_numbering_lines</code>——
+      這就是為什麼 report.pdf 的表格是「逐格換行」而不是 Markdown 表格（pdfplumber 抽不到結構化格子）。</li>
+  <li><strong>音訊</strong>：tone.wav 有轉錄依賴時拋 <code>UnknownValueError</code>、無依賴時優雅降級只輸出 metadata——
+      同一個檔案「成敗取決於依賴安裝與否」。</li>
+  <li><strong>ZIP</strong>：解壓到暫存、逐檔遞迴轉換、保留結構、結束清理——輸出以「Content from the zip file」分節。</li>
+</ul>
+<div class="callout warn"><strong>大家以為轉換沒問題但其實丟資訊</strong><br>
+<strong>XLSX 的合併列與 NaN</strong>：案例的 sales-data.xlsx 輸出中，<code>Total</code> 列是「合併儲存格」。
+pandas 讀進來後合併格被展開、其餘儲存格變 <code>NaN</code>——表格「成功」轉出來了，
+但<strong>「這是一列橫跨的總計」的語意消失了</strong>。輸出看起來正常，少了的是結構資訊。
+這是最難發現的資訊遺失：它不報錯，只靠讀者對照原始檔案才看得出。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+  <tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+  <tr><td>本地輸出與案例頁不同</td><td>版本差異</td><td>對齊 v0.1.7（上游 fd239d5）；<code>markitdown -v</code> 確認</td></tr>
+  <tr><td>音訊檔案有時成功有時拋例外</td><td>有無安裝 <code>[audio-transcription]</code></td><td>統一環境；無轉錄需求就別裝該 extras</td></tr>
+  <tr><td>XLSX 出現 <code>NaN</code> 行</td><td>合併儲存格展開</td><td>後處理過濾 <code>NaN</code>；或接受為「誠實輸出」</td></tr>
+  <tr><td>圖片無 EXIF 段</td><td>缺 exiftool 或 <code>EXIFTOOL_PATH</code> 未設定</td><td>安裝 exiftool；案例用環境變數指定</td></tr>
+  <tr><td>ZIP 內的子檔沒被轉換</td><td>副檔名無法被辨識</td><td>確認子檔格式有對應 converter；ZipConverter 逐檔遞迴</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+  <li>把案例擴充成「golden file」測試：把目前的輸出存成基準檔，之後每次跑都 diff，寫出測試腳本。</li>
+  <li>重現 tone.wav 的兩種行為（有/無轉錄依賴），比較 stdout 與例外，寫成對照測試。</li>
+  <li>用 markitdown 轉 MarkItDown 自己的 <code>README.md</code>，觀察「Markdown 轉 Markdown」會發生什麼（是否原樣保留），並解釋原因。</li>
+</ol>
+
+</div>
+
 </footer>
 </div>
 </body>

@@ -113,6 +113,63 @@ docker run -it --rm -v $(pwd):/workdir markitdown-mcp:latest
   <li>用 <code>docker images | grep markitdown</code> 確認映像大小。</li>
 </ol>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>① 進階真實情境：容器化批次管線 + 掛載資料卷 + CI 排程</h2>
+<p>場景：你有一個「每晚自動把上傳目錄的檔案轉成 Markdown」的批次任務。
+要跑在 CI（如 GitHub Actions）或 cron 上，並保證<strong>每次執行環境完全一致</strong>。</p>
+<pre># 1. 批次轉換腳本（掛載資料卷）
+docker run --rm \
+  -v "$(pwd)/uploads:/in:ro" \
+  -v "$(pwd)/out:/out:rw" \
+  markitdown:latest \
+  sh -c 'for f in /in/*.pdf; do markitdown "$f" -o "/out/$(basename "${f%.pdf}").md"; done'</pre>
+<pre># 2. 整合進 CI：環境一致 + 可重現
+# .github/workflows/convert-nightly.yml 節錄
+- name: Convert uploads
+  run: |
+    docker build -t markitdown:latest .
+    docker run --rm -v "$PWD/uploads:/in:ro" -v "$PWD/out:/out" \
+      markitdown:latest sh -c 'for f in /in/*; do markitdown "$f" -o "/out/$(basename "$f").md"; done'
+- name: Verify outputs
+  run: test -s out/*.md || exit 1</pre>
+<p><strong>為什麼選這條路徑</strong>：容器把<strong>依賴版本、系統工具（exiftool）、Python 環境</strong>全部封裝——
+CI 與本機的結果才可能一致。用 <code>:ro</code> 唯讀掛載輸入目錄，避免批次任務意外改動原始檔；
+輸出目錄用 <code>:rw</code> 寫回主機。這是「隔離執行、資料外流」的標準容器模式。</p>
+
+<h2>② 深入原理擴充：映像內容與「容器 vs 本機」的差異來源</h2>
+<p>理解 Dockerfile 裝了什麼，才能預測容器行為：</p>
+<ul>
+  <li>映像建置會 <code>pip install markitdown[all]</code>（含 pdfminer、mammoth、openpyxl 等），
+      所以容器內<strong>所有格式都可用</strong>——本機沒裝 extras 的差異在容器內不存在。</li>
+  <li>exiftool 是否裝入映像，決定圖片/音訊 EXIF 輸出是否為空。</li>
+  <li>容器預設使用者是 root；<code>-v</code> 掛載後，容器內寫出的檔案權限歸屬可能與你預期不同。</li>
+</ul>
+<div class="callout warn"><strong>大家以為轉換沒問題但其實丟資訊</strong><br>
+<strong>stdin 管道 + 忘了 <code>-i</code></strong> 是容器化最常踩的坑：<code>docker run markitdown:latest &lt; file.pdf</code>
+沒加 <code>-i</code>，stdin 是空的——命令「執行成功」但輸出空字串，你以為轉好了其實什麼都沒讀到。
+同理，容器預設<strong>不掛載本機目錄</strong>，<code>file.pdf</code> 路徑在容器內不存在，
+轉換失敗的原因常常是路徑，不是轉換器。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+  <tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+  <tr><td>容器內找不到輸入檔</td><td>未掛載目錄或路徑寫錯</td><td>加 <code>-v $(pwd):/workdir</code>，容器內用 <code>/workdir/...</code> 路徑</td></tr>
+  <tr><td>stdin 管道轉出空字串</td><td>忘了 <code>-i</code>（interactive）</td><td><code>docker run --rm -i markitdown:latest &lt; file.pdf</code></td></tr>
+  <tr><td>映像無法建置</td><td>Dockerfile 不在根目錄 / daemon 未啟動 / 磁碟滿</td><td>確認 Dockerfile 位置、<code>docker info</code>、清理空間</td></tr>
+  <tr><td>容器寫出的檔案權限怪異</td><td>容器以 root 執行</td><td>加 <code>--user $(id -u):$(id -g)</code> 或調整掛載目錄權限</td></tr>
+  <tr><td>圖片/音訊輸出缺 EXIF 段</td><td>映像內沒裝 exiftool</td><td>在 Dockerfile 加 <code>RUN apt-get install -y exiftool</code> 或設定 <code>EXIFTOOL_PATH</code></td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+  <li>寫一個 <code>docker-compose.yml</code>：掛載輸入輸出目錄、限制 <code>read_only</code>、設定 non-root user，重現批次轉換管線。</li>
+  <li>設計一個「多版本測試」：同一台機器跑 <code>markitdown:0.1.6</code> 與 <code>markitdown:latest</code> 兩個容器，比較輸出差異。</li>
+  <li>實作「映像瘦身」：用 multi-stage build 只保留執行所需依賴，量測減少的映像大小。</li>
+</ol>
+
+</div>
+
 </footer>
 </div>
 </body>

@@ -158,6 +158,63 @@ result = md.convert("invoice.pdf")
   <li>用 <code>cu_file_types</code> 限制只有 PDF 走 CU，測試 XLSX 是否仍用內建轉換。</li>
 </ol>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>① 進階真實情境：本機＋雲端混和路由 + 成本控管 + 品質閘</h2>
+<p>場景：你的文件庫有「電子 PDF」與「掃描 PDF」兩種。電子 PDF 內建 converter 就夠好且免費；
+掃描 PDF 內建會「假成功」出空字串。目標：<strong>只讓該上雲的檔案上雲，其餘留本機</strong>——品質與成本兼顧。</p>
+<pre>from pathlib import Path
+from markitdown import MarkItDown
+from markitdown.converters import ContentUnderstandingFileType
+
+# 策略：CU 只服務 PDF；其餘格式（docx/xlsx/mp4）看 cu_file_types 決定
+md = MarkItDown(
+    cu_endpoint="https://&lt;resource&gt;.cognitiveservices.azure.com/",
+    cu_file_types=[ContentUnderstandingFileType.PDF],   # 只讓 PDF 走 CU
+)
+
+for pdf in Path("scans/").glob("*.pdf"):
+    text = md.convert_local(str(pdf)).markdown
+    # 品質閘：掃描 PDF 若內建抽出太少，補一次 CU
+    if len(text.strip()) &lt; 100:
+        text = md.convert_local(str(pdf), use_content_understanding=True)
+    print(f"{pdf.name}: {len(text)} chars")</pre>
+<p><strong>為什麼選這條路徑</strong>：全走 CU 會讓每份文件都計費；全走內建則掃描件品質崩盤。
+用 <code>cu_file_types</code> 建立「<strong>預設本機、指定格式上雲</strong>」的路由，
+再用字數品質閘做<strong>補償性升級</strong>——先免費試，不夠好才付費重轉。這是把成本控制變成可執行策略的標準做法。</p>
+
+<h2>② 深入原理擴充：CU 的 analyzer 自動路由與 YAML front matter</h2>
+<p>Content Understanding 的「零設定」背後其實有一套<strong>自動路由邏輯</strong>：</p>
+<ul>
+  <li>依檔案的型別偵測結果，自動挑 analyzer：文件 → <code>prebuilt-documentSearch</code>、影片 → <code>prebuilt-videoSearch</code>。</li>
+  <li>可以 <code>cu_analyzer_id</code> 指定自訂 analyzer，抽出領域欄位（發票金額、收據日期…）。</li>
+  <li>結構化欄位會序列化成<strong>YAML front matter</strong> 放在 Markdown 開頭，讓 LLM 直接讀到欄位值。</li>
+</ul>
+<div class="callout warn"><strong>大家以為轉換沒問題但其實丟資訊</strong><br>
+<strong>YAML front matter 只在 analyzer 有定義欄位時才出現</strong>。用 <code>prebuilt-documentSearch</code>
+轉一份含「金額表格」的文件，輸出是版面文字——不是結構化欄位，因為文件 analyzer 不抽發票欄位。
+很多人以為「用了 CU 就有欄位」，其實<strong>欄位是 analyzer 的定義，不是自動的</strong>；
+要拿欄位得用自訂 analyzer。若你的下游依賴 YAML fields，務必先確認 analyzer 有定義。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+  <tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+  <tr><td>CU 轉換後沒有 YAML front matter</td><td>使用的 analyzer 未定義那些欄位</td><td>改用自訂 analyzer 或預建的 documentFields 系列</td></tr>
+  <tr><td>某些格式沒走 CU（該收費的沒收費）</td><td><code>cu_file_types</code> 未包含該格式</td><td>檢查 <code>ContentUnderstandingFileType</code> 白名單</td></tr>
+  <tr><td>帳單暴增</td><td>太多格式走 CU</td><td>縮小 <code>cu_file_types</code>；先本機後補償升級</td></tr>
+  <tr><td><code>-d</code> 與 <code>--use-cu</code> 無法同時用</td><td>兩條 Azure 路徑互斥</td><td>擇一；同一次轉換只能用一條雲端服務</td></tr>
+  <tr><td>認證失敗（401/403）</td><td>端點 URL 或 API Key 錯誤</td><td>確認資源端點、設定環境變數或傳入參數</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+  <li>設計一份「成本控管策略」：列出 5 種格式，各標註「走內建 / 走 CU」，並預估每月 API 呼叫數與費用。</li>
+  <li>實作「補償升級」管線：本機轉換 → 品質評分 → 低分才送 CU，並記錄每次升級的次數與成本。</li>
+  <li>比較同一份掃描 PDF 用「內建」「Document Intelligence」「Content Understanding」三種輸出的差異，列出各自擅長與丟失的資訊。</li>
+</ol>
+
+</div>
+
 </footer>
 </div>
 </body>

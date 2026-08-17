@@ -146,6 +146,86 @@ def safe_convert_uri(md, uri):
   <li>比較 <code>convert()</code> 與 <code>convert_local()</code> 的權限範圍差異。</li>
 </ol>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>① 進階真實情境：打造安全的檔案轉換 API（消毒 + 白名單 + 沙箱）</h2>
+<p>場景：你要把 MarkItDown 包成一個對外服務，使用者可上傳檔案、要求轉換。
+攻擊面很大——路徑穿越、SSRF、外掛任意碼執行。以下是「安全地包裝」的完整工作流。</p>
+<pre>import os, io
+from pathlib import Path
+from urllib.parse import urlparse
+from markitdown import MarkItDown
+
+ALLOWED_DIR = Path("/data/uploads").resolve()
+
+def safe_local(path_str: str) -&gt; Path:
+    # 1. 消毒輸入：解析路徑並確認在允許目錄內（擋 . . / 穿越）
+    p = (ALLOWED_DIR / path_str).resolve()
+    if not p.is_relative_to(ALLOWED_DIR):
+        raise ValueError("path traversal blocked")
+    return p
+
+def safe_uri(uri: str):
+    # 2. 限制 scheme + 封鎖私網位址（防 SSRF）
+    parsed = urlparse(uri)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError("scheme not allowed")
+    if parsed.hostname in ("localhost", "127.0.0.1") or \
+       parsed.hostname == "169.254.169.254" or \
+       parsed.hostname.startswith("10."):
+        raise ValueError("private/metadata address blocked")
+    return uri
+
+# 3. 只用最窄 API + 禁止外掛（外掛 = 任意程式碼）
+md = MarkItDown(enable_plugins=False)
+
+def handle_upload(filename: str):
+    p = safe_local(filename)
+    return md.convert_local(str(p)).markdown
+
+def handle_url(url: str):
+    # 4. 自己抓取、設 timeout、再交給 convert_response
+    import requests
+    resp = requests.get(safe_uri(url), timeout=30)
+    resp.raise_for_status()
+    return md.convert_response(resp).markdown</pre>
+<p><strong>為什麼選這條路徑</strong>：安全不是「一個函數」，是<strong>一層層消毒與收窄</strong>——
+先驗證路徑/scheme，再關掉外掛，最後只用最窄 API。每一層都擋住一類攻擊：
+路徑穿越（path traversal）、SSRF（metadata service、內網）、任意程式碼執行（plugin）。</p>
+
+<h2>② 深入原理擴充：MarkItDown 的四個攻擊面</h2>
+<p>把 MarkItDown 當成黑盒只會「出事才發現」。先畫出攻擊面：</p>
+<ul>
+  <li><strong>檔案路徑</strong>：<code>convert_local()</code> 只是 <code>open()</code> 的包裝——<code>../../etc/passwd</code> 會照讀。</li>
+  <li><strong>URI</strong>：<code>convert_uri()</code> 的 <code>file:</code> 會解成本機路徑（netloc 非 localhost 才擋），<code>http(s):</code> 會抓內網或 metadata service。</li>
+  <li><strong>data URI</strong>：base64 解碼成 bytes 再轉換——巨大 payload 可造成記憶體耗用。</li>
+  <li><strong>外掛</strong>：<code>accepts()</code> / <code>convert()</code> 都是外部程式碼，會以你的權限執行。</li>
+</ul>
+<div class="callout warn"><strong>大家以為轉換沒問題但其實丟資訊（或洩密）</strong><br>
+<strong>「我只是轉個網頁」的 SSRF</strong>：使用者傳 <code>http://169.254.169.254/latest/meta-data/</code>
+（雲端 metadata 服務），<code>convert_uri()</code> 會真的去抓——那不是「轉換失敗」，
+是<strong>把你的內網/雲端憑證資訊洩露進輸出</strong>。攻擊面最大的誤區是：以為 MarkItDown 只讀檔案，
+其實 <code>convert()</code> 可以觸發本機檔 + 網路 + base64 解碼三種 I/O。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+  <tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+  <tr><td>使用者能讀到系統檔案</td><td>未驗證路徑，<code>..</code> 穿越</td><td>resolve + 確認在允許目錄內，只用 <code>convert_local()</code></td></tr>
+  <tr><td>轉換 URL 打到內網服務</td><td>SSRF，未限制 scheme/目的</td><td>白名單 scheme；封鎖 loopback/link-local/metadata 位址</td></tr>
+  <tr><td>第三方外掛執行惡意程式碼</td><td>信任了未驗證來源的外掛</td><td>只用信任來源；生產環境 <code>enable_plugins=False</code></td></tr>
+  <tr><td>MCP 服務可被同機其他程序呼叫</td><td>localhost 綁定的信任邊界</td><td>放容器/VM 沙箱；不綁非 localhost 介面</td></tr>
+  <tr><td>大量 data URI 造成記憶體暴增</td><td>base64 payload 未限制大小</td><td>在進入 <code>convert_uri</code> 前限制 <code>data:</code> 的大小</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+  <li>寫一組測試：對 <code>safe_local()</code> 餵 <code>../../etc/passwd</code>、絕對路徑、符號連結，驗證全部被擋。</li>
+  <li>實作一個「data URI 大小限制」的包裝器：超過 1MB 直接拒絕，不進入 MarkItDown。</li>
+  <li>設計「深度防禦」架構圖：Web 層（消毒）→ 轉換層（最窄 API、無外掛）→ 沙箱層（容器/VM），標出每一層擋住哪種攻擊。</li>
+</ol>
+
+</div>
+
 </footer>
 </div>
 </body>

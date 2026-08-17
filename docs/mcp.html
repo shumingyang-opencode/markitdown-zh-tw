@@ -137,6 +137,62 @@ curl -X POST http://127.0.0.1:3001/mcp \
   <li>配置 Claude Desktop 連接 markitdown-mcp，實際在對話中使用。</li>
 </ol>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>① 進階真實情境：團隊共享的轉換服務 + Docker 掛載 + 存取控管</h2>
+<p>場景：你的團隊有 5 個 agent（Claude Desktop、自訂工具）都需要轉換文件。
+你不想每台機器都裝核心，而是<strong>跑一個共享的 markitdown-mcp 服務</strong>，只對團隊內部網段開放。</p>
+<pre># 1. 用 Docker 啟動共享服務，掛載共享資料夾
+docker run -d --name md-mcp \
+  -v /srv/team-data:/workdir \
+  -p 127.0.0.1:3001:3001 \
+  markitdown-mcp:latest \
+  markitdown-mcp --http --host 0.0.0.0 --port 3001</pre>
+<pre># 2. 健康檢查：確認工具可用
+curl -X POST http://127.0.0.1:3001/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"tool":"convert_to_markdown","uri":"file:///workdir/report.pdf"}'</pre>
+<div class="callout warn"><strong>安全警示</strong>：上述 <code>--host 0.0.0.0</code> 是把服務曝露到所有介面——
+<strong>只有在你確定身處隔離的內網、且接受無認證風險時才這樣做</strong>。
+官方建議是「<strong>不要綁到非 localhost 介面</strong>」；若要共享，正確做法是放在 VM/容器沙箱內、
+用防火牆限制來源 IP，並讓每個 agent 透過各自的 localhost 隧道連線。</div>
+<p><strong>為什麼選這條路徑</strong>：MCP 的價值是<strong>單一工具 + 統一協定</strong>——
+5 個 agent 只要會 MCP 就能用，不需要各自整合 MarkItDown SDK。
+掛載 <code>/workdir</code> 讓「本機檔案」在容器內有對應路徑，是容器化 MCP 最常踩的坑。</p>
+
+<h2>② 深入原理擴充：三種 transport 的差異與 URI 解析</h2>
+<p>markitdown-mcp 支援三種傳輸層，理解差異才能選對部署方式：</p>
+<ul>
+  <li><strong>STDIO</strong>：JSON-RPC 走 stdin/stdout，最適合「MCP client 直接 spawn 子行程」的場景（Claude Desktop 就是）。</li>
+  <li><strong>Streamable HTTP</strong>：POST <code>/mcp</code>，REST-like，適合遠端服務；預設綁 localhost。</li>
+  <li><strong>SSE</strong>：Server-Sent Events，適合伺服器推送。</li>
+</ul>
+<p><code>convert_to_markdown(uri)</code> 內部就呼叫核心的 <code>convert_uri()</code>——
+<code>file:</code> / <code>data:</code> / <code>http:</code> / <code>https:</code> 都能吃。</p>
+<div class="callout warn"><strong>大家以為轉換沒問題但其實丟資訊</strong><br>
+<strong>Docker 掛載路徑的錯位</strong>是 MCP 場景最典型的「假失敗」：你掛載 <code>-v /home/user/data:/workdir</code>，
+但 agent 傳的 URI 是 <code>file:///home/user/data/report.pdf</code>——容器內根本沒有這個路徑，
+轉換「失敗」或讀不到。不是轉換器有問題，是<strong>路徑空間不一致</strong>。解決：統一用 <code>file:///workdir/...</code> 作為容器內的真實路徑。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+  <tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+  <tr><td>Connection refused: localhost:3001</td><td>服務沒啟動或綁錯介面</td><td>確認 <code>markitdown-mcp --http --host 127.0.0.1 --port 3001</code> 在跑</td></tr>
+  <tr><td>agent 讀不到容器內檔案</td><td>掛載路徑與 URI 路徑空間不一致</td><td>統一用 <code>/workdir</code> 路徑；確認 <code>-v</code> 有掛載</td></tr>
+  <tr><td>Docker 內 STDIO 無法互動</td><td>少了 <code>-i</code>（interactive）</td><td>Claude Desktop 設定 <code>"args": ["run", "--rm", "-i", ...]</code></td></tr>
+  <tr><td>HTTP 模式可被同機其他程序呼叫</td><td>localhost 綁定但同機共享</td><td>這是預設安全模型；需要隔離就放容器/VM 沙箱</td></tr>
+  <tr><td>轉換大檔時 MCP 呼叫逾時</td><td>HTTP transport 同步等待長轉換</td><td>拆檔批次轉、或改用 async transport / 更長 timeout</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+  <li>用 MCP Inspector 分別測試 STDIO、Streamable HTTP、SSE 三種傳輸，記錄連線設定差異。</li>
+  <li>設計一個「雙層隔離」部署：markitdown-mcp 放容器內、agent 只透過 localhost 隧道連線，畫出安全邊界。</li>
+  <li>實作一個自訂 transport 包裝：攔截 <code>convert_to_markdown</code> 的 URI，強制把 <code>/home</code> 前綴改寫成 <code>/workdir</code>。</li>
+</ol>
+
+</div>
+
 </footer>
 </div>
 </body>

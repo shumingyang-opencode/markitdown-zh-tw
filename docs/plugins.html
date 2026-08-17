@@ -139,6 +139,70 @@ result = md.convert("document.pdf")</pre>
   <li>故意移除 entry-point 宣告，觀察外掛消失的行為。</li>
 </ol>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>① 進階真實情境：自建 .rtf 外掛 + priority 攔截 + 打包發佈</h2>
+<p>場景：公司內部有大量 RTF 合約，MarkItDown 內建不支援。你要寫一個外掛補上，
+並<strong>確保它優先於兜底 converter</strong>——否則 RTF 會被 PlainTextConverter 當純文字「成功」轉出。</p>
+<pre># my_rtf_plugin.py
+from markitdown import MarkItDown
+from markitdown._base_converter import DocumentConverter, DocumentConverterResult
+from markitdown import StreamInfo
+
+class RtfConverter(DocumentConverter):
+    def accepts(self, file_stream, stream_info: StreamInfo, **kwargs) -&gt; bool:
+        return stream_info.extension == ".rtf" or stream_info.mimetype == "application/rtf"
+    def convert(self, file_stream, stream_info, **kwargs) -&gt; DocumentConverterResult:
+        raw = file_stream.read().decode("cp1252", errors="replace")  # RTF 是控制碼文字
+        text = strip_rtf_control(raw)  # 簡化：剝掉 {\rtf...} 控制字
+        return DocumentConverterResult(markdown=text)
+
+def register_converters(markitdown: MarkItDown, **kwargs):
+    # priority=-1.0 搶在 PlainText(10.0)/Html(10.0) 之前
+    markitdown.register_converter(RtfConverter(), priority=-1.0)
+
+__plugin_interface_version__ = 1</pre>
+<pre># pyproject.toml（打包成可 pip 安裝的套件）
+# [project.entry-points."markitdown.plugin"]
+# my_rtf_plugin = "my_rtf_plugin"</pre>
+<p><strong>為什麼選這條路徑</strong>：外掛系統的設計就是「<strong>安裝即註冊、priority 控制優先序</strong>」。
+用負 priority 讓 RTF 專屬 converter 搶在通用兜底之前；打包成 pip 套件後，
+團隊成員只要 <code>pip install my-rtf-plugin</code> 就能生效，不需要改核心程式。</p>
+
+<h2>② 深入原理擴充：外掛載入的「lazy 快取」與 priority 攔截</h2>
+<p>外掛機制有三個容易被忽略的內部行為：</p>
+<ul>
+  <li><strong>lazy 快取</strong>：<code>_load_plugins()</code> 用模組級全域 <code>_plugins</code> 記快取，
+      第一次呼叫才真的 <code>entry_points(group="markitdown.plugin")</code>——
+      <strong>同一個 process 內改外掛程式碼不會立刻生效</strong>。</li>
+  <li><strong>單一外掛壞了不拖垮全部</strong>：單一 plugin 的 <code>load()</code> 拋例外只 <code>warn()</code> 並跳過。</li>
+  <li><strong>register_converter 用 <code>insert(0, ...)</code></strong>：後註冊者排前面，搭配穩定排序決定同 priority 的嘗試順序。</li>
+</ul>
+<div class="callout warn"><strong>大家以為轉換沒問題但其實丟資訊</strong><br>
+<strong>OCR 外掛的「靜默略過」</strong>是最常被誤解的：沒有 <code>llm_client</code> 時，
+<code>markitdown-ocr</code> 的四個增強 converter 仍會載入，但 <code>convert()</code> 內部<strong>靜默退回內建行為</strong>——
+不會報錯、不會警告。你以為「開了外掛就有 OCR」，其實掃描 PDF 的圖片文字從頭到尾都沒被抽取，
+輸出「正常」但資訊缺了一整層。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+  <tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+  <tr><td><code>--list-plugins</code> 看不到外掛</td><td>entry-point 沒宣告或套件沒安裝</td><td>檢查 <code>pyproject.toml</code> 的 <code>[project.entry-points."markitdown.plugin"]</code></td></tr>
+  <tr><td>外掛載入但從不執行</td><td>未設 <code>enable_plugins=True</code> / 未加 <code>--use-plugins</code></td><td>開旗標；外掛預設關閉是設計行為</td></tr>
+  <tr><td>OCR 外掛沒抽到圖片文字</td><td>缺 <code>llm_client/llm_model</code>，靜默略過</td><td>提供 OpenAI client + model；確認輸出含 <code>[Image OCR]</code> 區塊</td></tr>
+  <tr><td>自己的 converter 順序不對</td><td>priority 設錯</td><td>負值保證在內建(0.0)之前；印出 <code>md._converters</code> 確認</td></tr>
+  <tr><td>改外掛程式碼但行為沒變</td><td>lazy 快取已載入</td><td>重啟 process；或直接呼叫 <code>_load_plugins.cache_clear()</code>（如有）</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+  <li>實作完整的 <code>RtfConverter</code>（含真正的 RTF 控制碼剝除），寫測試驗證 <code>accepts()</code> 對 <code>.rtf</code> 與 <code>text/rtf</code> 都回 True。</li>
+  <li>設計兩個外掛：一個 <code>priority=-1.0</code>、一個 <code>priority=10.0</code>，同時處理同一個格式，驗證誰先被嘗試。</li>
+  <li>追蹤「外掛載入失敗」的容錯行為：讓你的外掛在 <code>register_converters</code> 拋例外，確認主程式不中斷。</li>
+</ol>
+
+</div>
+
 </footer>
 </div>
 </body>

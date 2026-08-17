@@ -146,6 +146,69 @@ YouTubeConverter 依賴 <code>youtube-transcription</code> 套件。若影片無
   <li>用 <code>echo "hello" | markitdown -x .xyz</code> 測試未知格式的 fallback 行為。</li>
 </ol>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>① 進階真實情境：批次處理異質文件庫 + 品質抽樣 + 外掛補強</h2>
+<p>場景：你的公司有一個混雜的文件庫——DOCX 合約、掃描 PDF、XLSX 報表、PPTX 簡報混在一起。
+目標是全部轉成 Markdown 進 RAG。因為格式混雜，<strong>品質不能一視同仁</strong>：每個格式要各自的驗證閘。</p>
+<pre>from pathlib import Path
+from markitdown import MarkItDown
+from markitdown._exceptions import FileConversionException
+
+md = MarkItDown()
+rules = {
+    ".docx": lambda t: t.count("#") &gt;= 1,          # 標題結構
+    ".xlsx": lambda t: t.count("|") &gt;= 3,          # 至少一張表
+    ".pdf":  lambda t: len(t) &gt; 200,              # 掃描 PDF 會掛在這
+    ".pptx": lambda t: "Slide number" in t,
+}
+
+for path in Path("docs/").rglob("*"):
+    if path.suffix not in rules:
+        continue
+    try:
+        text = md.convert_local(str(path)).markdown
+        status = "PASS" if rules[path.suffix](text) else "LOW-Q"
+    except FileConversionException as e:
+        status = f"FAIL ({e.attempts[0].converter.__class__.__name__})"
+    print(f"{status:&gt;22}  {path}")</pre>
+<p><strong>為什麼選這條路徑</strong>：每個 converter 的輸出結構不同（DOCX 有標題、XLSX 有表格、PPTX 有 Slide 註解），
+所以驗證閘必須<strong>格式特定</strong>；只對標的格式設閘，其他格式不重複處理。
+把「失敗的 converter 名稱」直接印出來，是定位問題最快的線索。</p>
+
+<h2>② 深入原理擴充：三條「表格解析」之路</h2>
+<p>「把資料結構轉成 Markdown 表格」在 MarkItDown 裡至少有<strong>三條不同技術路線</strong>：</p>
+<ul>
+  <li><strong>CSV</strong>：<code>csv.Sniffer</code> 猜分隔符（逗號/分號/Tab…），首列當表頭，直接輸出 <code>| a | b |</code>。</li>
+  <li><strong>PDF</strong>：先試 pdfplumber <code>page.extract_tables()</code>；無邊框表格退回
+      <code>_extract_tables_from_words()</code>——用 word 的 x/y 座標聚類成欄與列。</li>
+  <li><strong>XLSX</strong>：pandas 讀整張表（含合併列、註解文字），<code>NaN</code> 代表空值。</li>
+</ul>
+<div class="callout warn"><strong>大家以為轉換沒問題但其實丟資訊</strong><br>
+<strong>XLSX 的合併儲存格</strong>是最典型的例子：pandas 會把合併格「展開」，
+但只有左上角有值，其餘是 <code>NaN</code>。你看到表格「轉換成功」，
+但原本一眼就能看出來的「橫跨三欄的總計列」在 Markdown 裡變成一行 <code>NaN</code>——資訊被結構性地丟掉。
+同理 PDF 的複雜合併格、PPTX 圖片若無 <code>llm_client</code> 只有 <code>![image](...)</code> 沒有描述。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+  <tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+  <tr><td>CSV 轉成表格但欄位全錯</td><td><code>csv.Sniffer</code> 猜錯分隔符</td><td>檢查檔案分隔符；必要時先預處理成標準 CSV</td></tr>
+  <tr><td>PDF 表格缺列或缺格</td><td>合併儲存格、無邊框表格</td><td>用 pdfplumber word 座標重組，或改用 Azure Document Intelligence</td></tr>
+  <tr><td>XLSX 出現大量 <code>NaN</code></td><td>空儲存格、合併格展開</td><td>轉換後過濾 <code>NaN</code>；確認合併格語意是否可接受</td></tr>
+  <tr><td>YouTube 字幕輸出為空</td><td>影片無字幕或缺 <code>youtube-transcription</code></td><td><code>pip install 'markitdown[youtube-transcription]'</code>；確認影片有開啟字幕</td></tr>
+  <tr><td>PPTX 圖片只有檔名沒有描述</td><td>未設定 <code>llm_client/llm_model</code></td><td>傳入 OpenAI client 與模型；沒 LLM 就只能接受無描述</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+  <li>準備一份有「合併儲存格 + 註解」的 XLSX，比較 pandas 輸出與原始語意，列出至少 3 種資訊遺失。</li>
+  <li>追蹤 <code>PdfConverter.convert()</code> 的表格流程，找出「有邊框表格」與「無邊框表格」走的是哪兩條 code path。</li>
+  <li>設計一個自訂 converter：把 <code>.csv</code> 但分隔符是 pipe（<code>|</code>）的檔案正確轉成 Markdown 表格。</li>
+</ol>
+
+</div>
+
 </footer>
 </div>
 </body>

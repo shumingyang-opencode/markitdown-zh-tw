@@ -155,6 +155,73 @@ print(result.text_content)  # 含 EXIF + LLM 描述</pre>
   <li>故意傳入不存在的檔案路徑，觀察例外類型與錯誤訊息。</li>
 </ol>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>① 進階真實情境：受控 HTTP 抓取 + 批次轉換 + 品質驗證服務</h2>
+<p>場景：你寫一個內部「文件轉換服務」，接收一批 URL，要轉成 Markdown 存進索引。
+關鍵需求：<strong>自己控制 HTTP 請求</strong>（設定 UA、timeout、proxy），再用 <code>convert_response()</code> 轉換——這正是<a href="security.html">安全守則</a>的第二條。</p>
+<pre>import requests
+from markitdown import MarkItDown
+
+def fetch_and_convert(urls, timeout=30, headers=None):
+    md = MarkItDown()
+    session = requests.Session()
+    session.headers.update(headers or {"User-Agent": "DocIngest/1.0"})
+    results = []
+    for url in urls:
+        resp = session.get(url, timeout=timeout)
+        resp.raise_for_status()                 # 401/404 直接失敗，別轉錯誤頁
+        try:
+            text = md.convert_response(resp).markdown
+            ok = len(text.strip()) &gt;= 100       # 品質閘
+        except Exception as e:                  # FileConversionException 等
+            text, ok = f"[ERROR] {e}", False
+        results.append({"url": url, "ok": ok, "chars": len(text)})
+    return results
+
+# 服務入口：只吃白名單 scheme（防 SSRF）
+from urllib.parse import urlparse
+def safe_convert(url):
+    if urlparse(url).scheme not in ("http", "https"):
+        raise ValueError("only http/https allowed")
+    return fetch_and_convert([url])</pre>
+<p><strong>為什麼選這條路徑</strong>：<code>convert_response()</code> 是「<strong>你抓、它轉</strong>」的契約——
+HTTP 細節（UA、驗證、proxy、timeout、重試）由你掌控，MarkItDown 只負責讀 response 轉換。
+配上 <code>raise_for_status()</code> 與字數品質閘，把「抓錯頁面」與「掃描假成功」都擋在進索引之前。</p>
+
+<h2>② 深入原理擴充：convert() 的「自動分派」其實是四條路線</h2>
+<p><code>convert(source)</code> 是方便的總入口，但它背後是<strong>依輸入型別分派的四個不同路徑</strong>：</p>
+<ul>
+  <li><code>str</code>：以 <code>http:/https:/file:/data:</code> 前綴判斷走 <code>convert_uri</code>，否則 <code>convert_local</code>。</li>
+  <li><code>Path</code>：直接 <code>convert_local</code>。</li>
+  <li><code>requests.Response</code>：走 <code>convert_response</code>。</li>
+  <li>有 <code>.read()</code> 的 bytes 流：走 <code>convert_stream</code>。</li>
+</ul>
+<div class="callout warn"><strong>大家以為轉換沒問題但其實丟資訊</strong><br>
+<code>convert_uri()</code> 對 <code>file:</code> URI 的 <code>netloc</code>（主機名）有驗證——非 localhost 會拋 <code>ValueError</code>。
+但很多人不知道 <code>data:</code> URI 的圖片<strong>預設會被截斷</strong>：<code>![image](data:image/png;base64,.....)</code>
+長到一個門檻就會被 <code>_markdownify</code> 截短，僅剩一段前綴——圖片「轉換成功」但實際內容被丟掉。
+要保留需用 <code>--keep-data-uris</code> 或自行處理 data URI。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+  <tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+  <tr><td><code>convert()</code> 對網路 URL 一直超時</td><td>內部抓取無 timeout</td><td>改用 <code>requests.get(timeout=30)</code> + <code>convert_response()</code></td></tr>
+  <tr><td>轉到 404 / 登入頁卻「成功」</td><td>沒 <code>raise_for_status()</code>，錯誤頁被當 HTML 轉了</td><td>抓取後先 <code>resp.raise_for_status()</code></td></tr>
+  <tr><td>純文字 stream 猜錯格式</td><td>stream 沒副檔名/MIME 線索</td><td>手動 <code>stream_info=StreamInfo(extension=..., mimetype=...)</code></td></tr>
+  <tr><td>圖片轉出截斷的 data URI</td><td>預設截斷長 base64</td><td>用 <code>--keep-data-uris</code> 或後處理恢復完整 URI</td></tr>
+  <tr><td><code>TypeError: unsupported type</code></td><td>傳入非 str/Path/Response/BinaryIO</td><td>確認型別；若已有 bytes 請包成 <code>io.BytesIO</code></td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+  <li>用 <code>convert_response()</code> 實作一個「帶重試與退避」的抓取器：失敗重試 3 次、指數退避，最後才把失敗記錄下來。</li>
+  <li>寫一個函數：接收任意型別（str/Path/Response/BytesIO），統一轉成 <code>StreamInfo</code> 提示後呼叫對應的 convert_* 方法。</li>
+  <li>測試 <code>convert_stream()</code> 對「不可 seek 的串流」（如 socket 包裝）如何處理——它會先讀成 BytesIO，驗證此行為。</li>
+</ol>
+
+</div>
+
 </footer>
 </div>
 </body>

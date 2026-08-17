@@ -140,6 +140,74 @@ result = md.convert("file.pdf")   # 進入 _convert() 調度鏈</pre>
   <li>故意不裝 <code>mammoth</code>，嘗試轉換 .docx，觀察錯誤訊息中的提示。</li>
 </ol>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>① 進階真實情境：自建轉換微服務 + 外掛優先權設計 + CI 驗證</h2>
+<p>場景：你的團隊要建一個「文件轉換 API」，把 DOCX/PDF/掃描件都轉成 Markdown。
+架構設計的關鍵決策：<strong>內建 converter 當底層、外掛處理特殊格式、並用 priority 控制覆寫順序</strong>。</p>
+<pre># 1. 定義服務骨架：核心 + 外掛 + 驗證
+from markitdown import MarkItDown
+from markitdown._base_converter import DocumentConverter, DocumentConverterResult
+import io
+
+class PdfQualityGateConverter(DocumentConverter):
+    """priority=-1.0 搶在內建之前：掃描 PDF 先檢查文字層，太薄就丟給 OCR 外掛。"""
+    priority_hint = -1.0
+    def accepts(self, file_stream, stream_info, **kwargs):
+        return stream_info.extension in (".pdf",) or stream_info.mimetype == "application/pdf"
+    def convert(self, file_stream, stream_info, **kwargs):
+        # 示意：回傳「需要 OCR」的標記，讓管線決定路由
+        return DocumentConverterResult(markdown="\u3010needs-ocr\u3011")
+
+md = MarkItDown(enable_plugins=True)
+md.register_converter(PdfQualityGateConverter(), priority=-1.0)
+
+# 2. 驗證優先權生效：內建 PDF(0.0) 被 -1.0 壓在後面
+print([c.converter.__class__.__name__ for c in md._converters])</pre>
+<pre># 3. 整合進 CI：每次改架構都跑一回歸測試
+# pytest test_architecture.py
+def test_priority_order():
+    md = MarkItDown()
+    names = [c.converter.__class__.__name__ for c in md._converters]
+    assert "PdfQualityGateConverter" in names
+    assert names.index("PdfQualityGateConverter") &lt; names.index("PdfConverter")</pre>
+<p><strong>為什麼選這條路徑</strong>：架構頁的核心是「<strong>可插拔策略 + priority 排序</strong>」。
+用外掛搶先內建來做品質閘，能不改動核心套件就介入調度；用 CI 回歸測試把「後註冊者優先」的規則變成可自動驗證的契約。</p>
+
+<h2>② 深入原理擴充：調度鏈的「隱藏契約」</h2>
+<p>架構上最容易被忽略的兩條隱藏契約：</p>
+<ul>
+  <li><strong>後註冊者優先</strong>：<code>register_converter()</code> 用 <code>insert(0, ...)</code> 插到清單頂端。
+      加上<strong>穩定排序</strong>（同 priority 保持註冊順序），同為 <code>0.0</code> 時最後註冊的最先試——
+      這就是外掛能覆蓋內建 converter 的根本機制。</li>
+  <li><strong>依賴延後</strong>：每個 converter 的第三方函式庫各自在 extras。沒裝 <code>mammoth</code> 只是「DOCX 不支援」，
+      其他 21 個 converter 照常運作——架構讓「部分失敗」成為可接受的狀態。</li>
+</ul>
+<div class="callout warn"><strong>大家以為轉換沒問題但其實丟資訊</strong><br>
+架構層級的「假成功」：<code>enable_builtins()</code> 重複呼叫只會 <code>warn()</code> 不報錯；
+外掛載入失敗（<code>entry_point.load()</code> 拋例外）也只 <code>warn()</code> 並跳過。
+你可能<strong>以為外掛在優先序最前面，其實它從沒被載入</strong>——整批轉換都走了內建，
+輸出「正常」但品質遠低於預期。除錯時務必檢查 <code>markitdown --list-plugins</code>。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+  <tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+  <tr><td>外掛 converter 從沒被呼叫</td><td>未開 <code>enable_plugins=True</code> 或 CLI 沒加 <code>--use-plugins</code></td><td>開啟旗標；用 <code>--list-plugins</code> 確認載入</td></tr>
+  <tr><td>外掛與內建行為衝突、順序不如預期</td><td>priority 設錯或誤解「後註冊者優先」</td><td>印出 <code>md._converters</code> 確認排序；負值才保證搶先內建</td></tr>
+  <tr><td><code>ModuleNotFoundError: No module named 'mammoth'</code></td><td>沒裝對應 extras</td><td><code>pip install 'markitdown[all]'</code> 或 <code>'markitdown[docx]'</code></td></tr>
+  <tr><td>重複 <code>enable_builtins()</code> 後行為怪異</td><td>converter 被註冊兩次</td><td>只呼叫一次；重複呼叫會 <code>warn()</code>，檢查呼叫點</td></tr>
+  <tr><td>同樣檔案在不同環境結果不同</td><td>依賴版本或外掛集合不同</td><td>鎖定版本（pip freeze / uv lock）；容器化以保證一致</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+  <li>在 <code>MarkItDown.__init__()</code> 之後手動呼叫 <code>enable_builtins()</code> 兩次，觀察 warn 訊息與 converter 數量變化。</li>
+  <li>寫兩個同為 <code>priority=0.0</code> 的外掛，反序註冊，驗證穩定排序下誰先被嘗試，並解釋原理。</li>
+  <li>設計一個「回歸測試矩陣」：對每個內建 converter，驗證「裝了 extras」與「沒裝 extras」兩種環境下 <code>accepts()</code> 的行為是否如預期。</li>
+</ol>
+
+</div>
+
 </footer>
 </div>
 </body>

@@ -134,6 +134,60 @@
   <li>選一個主題（外掛/MCP/雲端），深入閱讀並完成該頁的練習。</li>
 </ol>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>① 進階真實情境：設計你的第一個「端到端」轉換專案</h2>
+<p>場景：你不是為了學 API，而是要解決一個真實問題——「把散落的會議文件變成可搜尋的知識庫」。
+以這個目標為嚮導，把本頁所有主題串成一個專案，每個主題都是一個可驗收的里程碑。</p>
+<pre># 專案：會議知識庫 (meeting-kb)
+# 目標：一份 CI 腳本，把 uploads/ 的 PDF/DOCX/XLSX 轉成 Markdown，品質驗證後 commit 進知識庫
+
+# 里程碑 1（運作原理 + 架構）: 用 CLI 批次轉換，觀察輸出結構
+markitdown uploads/agenda.docx -o kb/agenda.md
+markitdown uploads/minutes.pdf -o kb/minutes.md
+
+# 里程碑 2（Python API + 外掛）: 寫 Python 批次器，加上品質閘與失敗分類
+python scripts/ingest.py --dir uploads --out kb
+
+# 里程碑 3（安全 + Docker）: 包成容器跑 cron，加入路徑消毒，確認不處理不可信輸入
+docker run --rm -v "$PWD/uploads:/in" -v "$PWD/kb:/out" meeting-kb:latest</pre>
+<p><strong>為什麼選這條路徑</strong>：教學頁的知識是<strong>分塊的，專案是把它們縫合起來的針線</strong>。
+每一步都對應一頁的主題，而「品質閘」「失敗分類」「路徑消毒」這些跨頁概念，
+只有在真實專案裡才會真正內化。做完這個專案，你就知道自己哪些頁其實沒讀懂。</p>
+
+<h2>② 深入原理擴充：學習地圖的「依賴順序」設計</h2>
+<p>本站的學習路線不是隨意排列的，背後是<strong>概念依賴圖</strong>：</p>
+<ul>
+  <li><strong>運作原理 → 架構</strong>：先懂「一條管線」的調度，再看「管線由哪些套件組成」。</li>
+  <li><strong>轉換器 → CLI/API</strong>：先懂「22 個黑箱各自做什麼」，再學怎麼呼叫它們。</li>
+  <li><strong>外掛 → MCP → 雲端</strong>：先懂「可插拔」，再看「如何包成服務、如何上雲」。</li>
+  <li><strong>安全最後</strong>：安全不是功能，是<strong>約束其他所有功能的邊界</strong>——最後讀才知道該防什麼。</li>
+</ul>
+<div class="callout warn"><strong>大家以為轉換沒問題但其實丟資訊</strong><br>
+<strong>「讀完 ≠ 會用」的認知落差</strong>：很多人看完所有頁面，就以為「只要一行 <code>convert()</code> 就能解決所有格式」。
+真相是：掃描 PDF 需要雲端、圖片描述需要 LLM、音訊轉錄需要外部 API、合併格會被攤平——
+<strong>沒有「免費且完美」的轉換</strong>。教學站的功能是告訴你每個選擇的取捨，而不是承諾魔法。
+若你跳過「限制與常見錯誤」小節，就會在真實資料上踩坑。</div>
+
+<h2>③ 診斷式疑難排解表</h2>
+<table>
+  <tr><th>症狀</th><th>可能原因</th><th>解決方案</th></tr>
+  <tr><td>讀完文件還是不知道從哪開始</td><td>缺少「目標導向」的切入點</td><td>用本頁 ① 的端到端專案作為嚮導，一步步做</td></tr>
+  <tr><td>學了 API 但不會整合進服務</td><td>缺少跨頁的系統思考</td><td>先做「批次 + 品質閘」最小專案，再逐步加外掛/雲端</td></tr>
+  <tr><td>以為某格式「應該支援」卻失敗</td><td>忽略了該頁的「限制」小節</td><td>回該格式頁看依賴與已知限制；掃描 PDF 需雲端/OCR</td></tr>
+  <tr><td>練習題做得出來但不會變通</td><td>只背了 API 沒懂原理</td><td>回去讀「深入原理」段落；原理決定你能否應付新情況</td></tr>
+  <tr><td>把不可信輸入直接丟給 convert()</td><td>跳過了安全頁</td><td>先讀 <a href="security.html">安全模型</a>；生產環境必須消毒輸入</td></tr>
+</table>
+
+<h2>④ 進階挑戰題</h2>
+<ol>
+  <li>設計你自己的「30 天學習計畫」：把 13 頁拆成可驗收的里程碑，每週一個主題、一個小專案。</li>
+  <li>畫出「概念依賴圖」：哪些頁要先讀、哪些可以並行，標出你自己的學習瓶頸。</li>
+  <li>選一個你常用的格式，實作它的完整處理鏈（本機 → 外掛 → 雲端），比較三者的品質與成本。</li>
+</ol>
+
+</div>
+
 </footer>
 </div>
 </body>
