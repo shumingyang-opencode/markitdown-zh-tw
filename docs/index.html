@@ -188,6 +188,158 @@ docker run --rm -v "$PWD/uploads:/in" -v "$PWD/kb:/out" meeting-kb:latest</pre>
 
 </div>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>⑤ 專案級端到端 Worked Example：五階段企業文件知識庫</h2>
+<p>場景：把全站知識縫合成一個可營運的系統——「企業文件知識庫」（enterprise-doc-kb）。
+規模假設：每天 +500 份文件、3 萬份歷史文件、5 個部門共用。與第 1 輪「單一管線」不同，
+這裡是<strong>整專案規模</strong>：每一階段對應本站不同 docs 頁，逐段可驗收。</p>
+<pre># 專案：enterprise-doc-kb（企業文件知識庫）
+
+# ── 階段 1 · 環境與基線（install + cli）──
+pip install 'markitdown[all]'
+markitdown -v                                  # 釘版本：v0.1.7
+markitdown sample.docx -o sample.md            # 手動基線：確認輸出結構
+
+# ── 階段 2 · 批次管線（python-api + how-it-works）──
+python scripts/ingest.py --dir uploads --out kb/
+# 逐檔 convert_local() + 格式特定品質閘 + 例外分類收集
+
+# ── 階段 3 · 品質與補強（converters + cloud）──
+# 掃描 PDF 被品質閘攔下 → 標記 needs-ocr → CU 補償升級
+# XLSX 合併格 NaN 語意 → 記錄已知失真，不當作錯誤
+
+# ── 階段 4 · 服務化（mcp + docker + security）──
+docker compose up -d                           # 轉換器 + MCP + 排程器
+# agent 透過 markitdown-mcp 查詢；輸入層消毒路徑/URI
+
+# ── 階段 5 · 索引與維運（worked + 監控）──
+python scripts/index.py --dir kb/ --index es   # 寫入檢索索引
+python scripts/quality_report.py --since 7d    # 每週品質報表</pre>
+<pre># 預期輸出（階段驗收）
+[1] 環境: markitdown -v → 0.1.7
+[2] 管線: 30000/30000 完成 · OK 96% · LOW-Q 3% · FAIL 1%
+[3] 品質: 掃描 PDF 升級率 &lt;5% · 平均字數 &gt;500
+[4] 服務: agent 查詢 100% 成功 · 無穿越/SSRF 事件
+[5] 索引: 30000 篇已索引 · 檢索延遲 P95 &lt;200ms</pre>
+<div class="callout info"><strong>為什麼這是「整專案規模」</strong>：第 1 輪的案例是「一個功能」，
+這裡是「一個產品」——環境、批次、品質、服務、維運五條線並行，
+每一條線都是對應 docs 頁知識的完整應用；最後的品質報表把整個專案變成可量測的系統。</div>
+
+<h2>⑥ 效能／品質／安全深度</h2>
+<ul>
+  <li><strong>效能</strong>：批次管線三大瓶頸——重複建 <code>MarkItDown()</code> 實例（應建一次重用）、
+  IO 密集（用 <code>Path.rglob</code> + worker 併發）、LLM/雲端呼叫（只對品質閘攔下的檔案觸發）。
+  以 3 萬份歷史檔估算：純本機約 30–60 分鐘，加入 CU 升級後視升級率決定額外成本。</li>
+  <li><strong>品質</strong>：品質不是「有輸出」，是「結構完整」——DOCX 至少一個 <code>#</code>、XLSX 至少一個 <code>|</code> 表格、
+  PDF 用「頁數 vs 字數」對照抓掃描件假成功。把驗證寫成可重跑的自動化，不靠肉眼。</li>
+  <li><strong>安全</strong>：輸入即攻擊面——上傳路徑做 <code>realpath</code> 白名單、URL 擋 metadata service
+  （<code>169.254.169.254</code>）、<code>enable_plugins=False</code>（第三方外掛=任意碼執行）。詳見<a href="security.html">安全模型</a>。</li>
+</ul>
+
+<h2>⑦ 文件間比較對照表：教學站四種「導覽」的定位差異</h2>
+<table>
+  <tr><th>面向</th><th>本文（文件教學）</th><th>相關文（學習路線／概念地圖／實作案例）</th><th>差異說明</th></tr>
+  <tr><td>目的</td><td>主題知識庫，查閱用</td><td>學習路線=路徑規劃；概念地圖=關聯圖；實作案例=真實輸出</td><td>本文是「內容」，其餘是「導覽與證據」</td></tr>
+  <tr><td>讀者</td><td>想查特定主題的人</td><td>路線/地圖給新手；案例給實務驗證者</td><td>本文偏參考書，其餘偏地圖與實驗室</td></tr>
+  <tr><td>更新頻率</td><td>隨上游 docs 翻譯，較穩定</td><td>案例隨版本釘選（v0.1.7）重跑</td><td>案例有版本依賴，本文不受影響</td></tr>
+  <tr><td>驗證方式</td><td>練習題 + 檢核清單</td><td>案例頁提供 golden 輸入/輸出可對照</td><td>本文靠自己動手，案例有現成答案</td></tr>
+</table>
+
+<h2>⑧ 互動式檢核清單：進階驗收</h2>
+<ul class="checklist">
+  <li><input type="checkbox" disabled> 我能不看文件重述 22 個轉換器的五大家族分類與各自依賴。</li>
+  <li><input type="checkbox" disabled> 我已用 CLI 與 Python API 各轉過至少 3 種格式並比較差異。</li>
+  <li><input type="checkbox" disabled> 我能舉出 2 個「沒有免費且完美的轉換」的取捨例子（掃描 PDF、合併格等）。</li>
+  <li><input type="checkbox" disabled> 我已設計並完成一個跨越 3 頁以上知識的端到端小專案。</li>
+  <li><input type="checkbox" disabled> 我知道哪些格式需要雲端／LLM／外掛才能高品質，並寫進決策表。</li>
+  <li><input type="checkbox" disabled> 我已把安全守則（消毒輸入、最窄 convert_*）實際放進我的專案程式碼。</li>
+</ul>
+
+</div>
+
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>⑤ 專案級端到端 Worked Example：全端企業文件處理系統</h2>
+<p>場景：你不是只學 API，而是要交付一個<strong>完整的產品</strong>——「企業文件處理系統」
+（enterprise-doc-processor），涵蓋前端上傳、後端轉換、品質驗證、索引寫入、監控告警五個子系統。
+每個子系統對應本站至少一個 docs 頁的知識，串起來就是一整套可交付的系統。</p>
+<pre># 專案架構（五個子系統 → 五個 docs 頁）
+
+# ── 子系統 1 · 上傳入口（security.html）──
+# Web 層：路徑消毒 + 格式白名單 + 大小限制
+# → 只允許白名單格式、<50MB、resolve 後在安全目錄
+
+# ── 子系統 2 · 轉換引擎（python-api + how-it-works）──
+# MarkItDown 實例（建一次重用）+ 逐檔 convert_local()
+# → 最窄 API、無外掛、StreamInfo 提示
+
+# ── 子系統 3 · 品質驗證（converters + cloud）──
+# 格式特定品質閘：DOCX 標題數 / XLSX 表格數 / PDF 字數
+# → 掃描 PDF 被攔下 → CU 補償升級
+
+# ── 子系統 4 · 索引寫入（worked.html）──
+# 轉換結果寫入向量資料庫（Elasticsearch / Weaviate）
+# → 用案例頁的 golden 輸出當驗收基準
+
+# ── 子系統 5 · 監控告警（docker + mcp）──
+# Docker 容器跑轉換 + MCP 提供 Agent 查詢 + Prometheus 指標
+# → 轉換率 <95% 自動告警</pre>
+<pre># 預期輸出（系統上線後的監控面板）
+┌──────────────────────────────────────────────┐
+│  Enterprise Doc Processor Dashboard          │
+├──────────────┬───────────────────────────────┤
+│ 今日轉換     │  487 / 500 (97.4%)           │
+│ 平均延遲     │  2.3s (本地) / 8.1s (CU)     │
+│ 品質通過率   │  96.2%                        │
+│ CU 升級率    │  3.8% (19 份)                │
+│ 今日花費     │  $0.19 (CU)                   │
+│ 安全事件     │  0                            │
+└──────────────┴───────────────────────────────┘</pre>
+<p><strong>為什麼這是「整專案規模」</strong>：第 1 輪是「五階段知識庫」的概念規劃；
+這裡是<strong>五個子系統各自的實作細節</strong>——安全層怎麼消毒、轉換層怎麼選擇 API、
+品質層怎麼做格式特定驗證、索引層怎麼對接向量資料庫、監控層怎麼告警。
+每個子系統都能獨立驗收，組起來就是可交付的產品。</p>
+
+<h2>⑥ 效能／品質／安全深度：跨頁主題的三面交織</h2>
+<ul>
+  <li><strong>效能</strong>：跨頁的效能瓶頸在<strong>轉換本身</strong>（pdfminer 秒級、CU 分鐘級），
+  而不是安全層（毫秒級）或監控層（非同步）。
+  優化策略：(1) <code>MarkItDown()</code> 建一次重用（避免重複初始化）、
+  (2) 本機先試 + CU 只補償（減少付費呼叫）、
+  (3) 併發用 process pool 而非 thread pool（<code>_convert()</code> 非執行緒安全）。</li>
+  <li><strong>品質</strong>：品質不是「有輸出」，是<strong>「結構完整 + 語意保留」</strong>——
+  本站反覆強調的「假成功」（掃描 PDF 空字串、XLSX 合併格 NaN），
+  只有在「格式特定品質閘」下才被發現。通用字數閘擋不住結構問題。
+  品質閘必須<strong>每種格式各寫一個</strong>——這是「沒有免費且完美轉換」的最直接體現。</li>
+  <li><strong>安全</strong>：安全不是一個功能，是<strong>約束其他所有功能的邊界</strong>——
+  路徑消毒約束了上傳、格式白名單約束了轉換、非 root 約束了容器、
+  <code>enable_plugins=False</code> 約束了外掛、localhost 綁定約束了 MCP。
+  每個約束都「限制了某些便利」，但每個約束都「擋住了某種攻擊」。
+  安全的代價是複雜度——需要持續測試、更新、滲透驗證。</li>
+</ul>
+
+<h2>⑦ 文件間比較對照表：教學站四種「導覽」的定位差異</h2>
+<table>
+  <tr><th>面向</th><th>本文（文件教學）</th><th>相關文（學習路線／概念地圖／實作案例）</th><th>差異說明</th></tr>
+  <tr><td>目的</td><td>主題知識庫，查閱用</td><td>學習路線=路徑規劃；概念地圖=關聯圖；實作案例=真實輸出</td><td>本文是「內容」，其餘是「導覽與證據」</td></tr>
+  <tr><td>讀者</td><td>想查特定主題的人</td><td>路線/地圖給新手；案例給實務驗證者</td><td>本文偏參考書，其餘偏地圖與實驗室</td></tr>
+  <tr><td>深度</td><td>每頁包含概念→案例→挑戰→檢核的完整循環</td><td>學習路線只有路徑；案例只有輸出</td><td>本文最深，但需要主動投入</td></tr>
+  <tr><td>驗證</td><td>練習題 + 檢核清單 + 挑戰題</td><td>案例頁提供 golden 輸入/輸出可對照</td><td>本文靠自己動手，案例有現成答案</td></tr>
+</table>
+
+<h2>⑧ 互動式檢核清單：進階驗收</h2>
+<ul class="checklist">
+  <li><input type="checkbox" disabled> 我能不看文件重述 MarkItDown 的五步驟調度管線。</li>
+  <li><input type="checkbox" disabled> 我已用 CLI 與 Python API 各轉過至少 3 種格式並比較差異。</li>
+  <li><input type="checkbox" disabled> 我能舉出 3 個「沒有免費且完美的轉換」的取捨例子。</li>
+  <li><input type="checkbox" disabled> 我已設計並完成一個跨越 5 頁以上知識的端到端小專案。</li>
+  <li><input type="checkbox" disabled> 我知道哪些格式需要雲端／LLM／外掛才能高品質，並寫進決策表。</li>
+  <li><input type="checkbox" disabled> 我已把安全守則（四層防禦、消毒輸入、最窄 convert_*）實際放進專案。</li>
+</ul>
+
+</div>
+
 </footer>
 </div>
 </body>

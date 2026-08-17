@@ -176,6 +176,102 @@ pandas 讀進來後合併格被展開、其餘儲存格變 <code>NaN</code>—�
 
 </div>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>⑤ 專案級端到端 Worked Example：案例回歸管線 + 版本釘選 + CI 守門</h2>
+<p>場景：案例頁的 11 種格式真實輸出是你的「行為承諾」。但手動重跑容易漏——某天換了版本，
+某個輸出悄悄變了。你要建一條<strong>自動化回歸管線</strong>：
+每次改動都重跑所有案例、與 golden 基準 diff、差異超過門檻就讓 CI 失敗。</p>
+<pre># 1. 回歸測試管線（tests/test_worked_regression.py）
+import subprocess, sys, hashlib
+from pathlib import Path
+
+GOLDEN_DIR = Path("worked/conversions")
+CASES = {
+    "office/sample-report.docx": {"must_have": ["##", "#", "|"], "must_not": ["NaN"]},
+    "pdf/report.pdf":            {"must_have": ["|", "---"], "must_not": []},
+    "office/sales-data.xlsx":    {"must_have": ["|"], "must_not": ["NaN", "NaN"]},
+    "archive/archive.zip":       {"must_have": ["Content from"], "must_not": []},
+    "web/example.html":          {"must_have": ["#"], "must_not": ["<script>"]},
+}
+
+def get_output(rel_path: str) -> str:
+    result = subprocess.run(
+        [sys.executable, "-m", "markitdown", str(GOLDEN_DIR / rel_path)],
+        capture_output=True, text=True, timeout=60,
+    )
+    return result.stdout
+
+def check_case(rel: str, spec: dict) -> bool:
+    text = get_output(rel)
+    ok = True
+    for token in spec["must_have"]:
+        if token not in text:
+            print(f"  FAIL: {rel} missing {token!r}")
+            ok = False
+    for token in spec["must_not"]:
+        if token in text:
+            print(f"  FAIL: {rel} unexpected {token!r}")
+            ok = False
+    if ok:
+        print(f"  PASS: {rel} ({len(text)} chars)")
+    return ok
+
+# 2. 執行 + 版本釘選驗證
+print(f"markitdown version: {subprocess.run([sys.executable, '-m', 'markitdown', '-v'], capture_output=True, text=True).stdout.strip()}")
+results = [check_case(rel, spec) for rel, spec in CASES.items()]
+if not all(results):
+    sys.exit(1)  # CI 失敗</pre>
+<pre># 3. 預期輸出（CI log）
+markitdown version: 0.1.7
+  PASS: office/sample-report.docx (8234 chars)
+  PASS: pdf/report.pdf (3120 chars)
+  FAIL: office/sales-data.xlsx unexpected 'NaN'
+  PASS: archive/archive.zip (1567 chars)
+  PASS: web/example.html (2345 chars)
+# exit code 1 → CI 失敗，阻止壞行為進版</pre>
+<p><strong>為什麼這是「整專案規模」</strong>：第 1 輪是「手動重跑 + 比對」；
+這裡是<strong>自動化管線 + golden 基準 + 版本釘選 + CI 守門</strong>——
+每次改動都跑全套案例，用 <code>assert</code> 檢查「該有的結構在、不該有的結構不在」，
+版本漂移在 CI 就被擋下。這正是「案例頁作為行為承諾」的落實。</p>
+
+<h2>⑥ 效能／品質／安全深度：案例測試的三面考量</h2>
+<ul>
+  <li><strong>效能</strong>：案例回歸管線的瓶頸在<strong>轉換本身</strong>（11 個格式各跑一次），
+  約 30-60 秒（取決於 PDF/XLSX 大小）。優化：(1) 用 <code>@pytest.mark.slow</code> 標記、
+  (2) 快速案例（CSV/HTML）先跑做 smoke test、
+  (3) 用 <code>pytest-xdist</code> 併發跑（注意 MarkItDown 實例不能共享於執行緒）。</li>
+  <li><strong>品質</strong>：案例頁的「真實輸出」是品質的<strong>最終仲裁者</strong>——
+  當你發現「XLSX 出現 NaN」時，不是 bug，而是「pandas 讀合併格的誠實輸出」。
+  案例頁的價值在於：它告訴你「MarkItDown 實際做了什麼」而不是「你期望它做什麼」。
+  每次升級版本後重跑案例，差異<strong>不一定是退步</strong>——可能是上游改善了輸出。</li>
+  <li><strong>安全</strong>：案例頁的 <code>worked/conversions/</code> 含真實檔案——
+  這些檔案<strong>不該包含敏感資料</strong>。用 <code>.gitignore</code> 排除可能含個資的測試檔、
+  用 dummy 資料代替真實合約/財務文件。CI 中的 <code>markitdown</code> 執行以 CI runner 權限運作，
+  確認 runner 無法存取生產資料目錄。</li>
+</ul>
+
+<h2>⑦ 文件間比較對照表：實作案例 vs 相關頁</h2>
+<table>
+  <tr><th>面向</th><th>本文（實作案例）</th><th>相關文（轉換器全覽／運作原理／程式碼對照）</th><th>差異說明</th></tr>
+  <tr><td>內容</td><td>11 種格式的<strong>真實輸出</strong>（不是示意）</td><td>轉換器=規格說明；原理=行為流程；code=函數實作</td><td>本文是「證據」，其餘是「說明」</td></tr>
+  <tr><td>驗證</td><td>可用 <code>markitdown</code> CLI 重現</td><td>轉換器頁只有依賴表；原理頁只有流程圖</td><td>本文可驗證，其餘只能理解</td></tr>
+  <tr><td>限制</td><td>NaN/空輸出/轉錄失敗的真實呈現</td><td>轉換器頁列限制表；原理頁解釋假成功</td><td>本文「展示」限制，其餘「描述」限制</td></tr>
+  <tr><td>版本</td><td>釘選 v0.1.7（上游 fd239d5）</td><td>其他頁不受版本影響</td><td>案例有版本依賴，其他頁穩定</td></tr>
+</table>
+
+<h2>⑧ 互動式檢核清單：進階驗收</h2>
+<ul class="checklist">
+  <li><input type="checkbox" disabled> 我已下載 worked/conversions/ 中的至少 3 個檔案，本地轉換後比較差異。</li>
+  <li><input type="checkbox" disabled> 我能解釋「案例頁的 NaN 不是 bug，而是 pandas 的誠實輸出」。</li>
+  <li><input type="checkbox" disabled> 我已把案例變成自動化回歸測試，並在版本升級時跑過一次。</li>
+  <li><input type="checkbox" disabled> 我能列出至少 3 個「案例輸出與你預期不同」的例子並解釋原因。</li>
+  <li><input type="checkbox" disabled> 我知道 dogfood 案例（用 MarkItDown 轉 MarkItDown 自己）的意義。</li>
+  <li><input type="checkbox" disabled> 我已確認案例目錄不含敏感資料，並用 .gitignore 保護測試檔。</li>
+</ul>
+
+</div>
+
 </footer>
 </div>
 </body>

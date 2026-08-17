@@ -208,6 +208,71 @@ def test_priority_order():
 
 </div>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>⑤ 專案級端到端 Worked Example：四套件組合成「單一轉換平台」</h2>
+<p>場景：把架構頁的四個套件（核心 / MCP / OCR 外掛 / sample-plugin）真正組合成一個
+「單一轉換平台」（md-platform），供本機批次、服務端 agent、雲端三種消費方式共用——
+端到端整合 <a href="python-api.html">Python API</a>、<a href="mcp.html">MCP</a>、<a href="cloud.html">雲端</a>與<a href="plugins.html">外掛</a>。</p>
+<pre># 1. 共用核心服務層（核心套件，被三種介面重複使用）
+# service.py —— 唯一的轉換實作，三種入口都呼叫它
+from markitdown import MarkItDown
+from markitdown.converters import ContentUnderstandingFileType
+
+class DocService:
+    def __init__(self, cu_endpoint=None):
+        self.md = MarkItDown(enable_plugins=False)
+        self.cu = MarkItDown(cu_endpoint=cu_endpoint,
+                             cu_file_types=[ContentUnderstandingFileType.PDF]) if cu_endpoint else None
+    def convert(self, local_path):      # 本機批次
+        return self.md.convert_local(local_path).markdown
+    def convert_cu(self, local_path):   # 雲端升級
+        return self.cu.convert_local(local_path).markdown</pre>
+<pre># 2. 三種消費介面
+#   a) CLI（markitdown 套件）    → 內部其實就是 DocService.convert()
+#   b) MCP（markitdown-mcp）     → convert_to_markdown(uri) 轉呼叫 DocService
+#   c) OCR 外掛（markitdown-ocr）→ 以 priority -1.0 攔截內建，讓 DocService 自動受惠</pre>
+<pre># 3. 預期輸出：同一份 scanned.pdf 三介面一致升級
+python batch.py scans/            # 走 service.convert → OCR 外掛攔截 → 內建
+curl -X POST localhost:3001/mcp -d '{"tool":"convert_to_markdown","uri":"file:///workdir/scans/1.pdf"}'
+# 三條路都輸出含 *[Image OCR]...* 區塊，行為完全一致</pre>
+<p><strong>為什麼這是「整專案規模」</strong>：第 1 輪聚焦「priority 排序」單一機制；
+這裡證明<strong>架構的價值在於重複利用</strong>——把核心邏輯放在一個 <code>DocService</code>，
+CLI / MCP / 外掛三種介面都只是薄殼，改一個地方、三處同步生效。
+這正是 monorepo 四套件的分工意義。</p>
+
+<h2>⑥ 效能／品質／安全深度：架構層的三面決策</h2>
+<ul>
+  <li><strong>效能</strong>：<code>pip install 'markitdown[all]'</code> 讓所有格式就緒，但犧牲啟動與記憶體；
+  <code>依賴延後</code> 讓「只裝需要的 extras」更輕量。容器化（<a href="docker.html">Docker</a>）可同時取得「全功能」與「乾淨隔離」。</li>
+  <li><strong>品質</strong>：容錯鏈是架構的品質保證——單一 converter 失敗不拖垮整個流程，
+  且 <code>FileConversionException.attempts</code> 保留所有失敗原因。但「後註冊者優先」若沒被理解，
+  可能讓外掛默默覆蓋內建行為而不自知。</li>
+  <li><strong>安全</strong>：架構決定攻擊面——外掛套件以你的權限執行程式碼；MCP 無認證；
+  <code>convert_uri()</code> 可觸發本機+網路雙重 I/O。架構設計時就要畫出信任邊界，詳見<a href="security.html">安全模型</a>。</li>
+</ul>
+
+<h2>⑦ 文件間比較對照表：架構 vs 相關頁</h2>
+<table>
+  <tr><th>面向</th><th>本文（架構總覽）</th><th>相關文（運作原理／程式碼對照／外掛）</th><th>差異說明</th></tr>
+  <tr><td>視角</td><td>靜態：模組、依賴、職責表</td><td>運作原理=動態流程；code 對照=逐函數；外掛=擴充機制</td><td>本文是「藍圖」，其餘是「流程/實作/擴充」</td></tr>
+  <tr><td>調度</td><td>列出 <code>_convert()</code> 為核心調度</td><td>how-it-works 詳述五步驟；core.html 展示實作</td><td>本文只標位置，其餘講行為與寫法</td></tr>
+  <tr><td>外掛</td><td>視為「後註冊者優先」的插槽</td><td>plugins 頁講 entry-point 協定；ocr 頁講 -1.0 攔截</td><td>本文講「為何可覆蓋」，外掛頁講「怎麼寫」</td></tr>
+  <tr><td>套件分工</td><td>四套件職責表是核心內容</td><td>mcp 頁講包裝成服務；docker 頁講打包部署</td><td>本文講「誰做什麼」，其餘講「怎麼用」</td></tr>
+</table>
+
+<h2>⑧ 互動式檢核清單：進階驗收</h2>
+<ul class="checklist">
+  <li><input type="checkbox" disabled> 我能說出四個套件的 PyPI 名稱、職責與依賴方向。</li>
+  <li><input type="checkbox" disabled> 我能解釋「後註冊者優先」+ 穩定排序如何讓外掛覆蓋內建 converter。</li>
+  <li><input type="checkbox" disabled> 我已用 <code>sorted(md._converters, key=lambda c: c.priority)</code> 觀察過實際排序。</li>
+  <li><input type="checkbox" disabled> 我能指出「依賴延後」在效能與失敗面各帶來什麼好處。</li>
+  <li><input type="checkbox" disabled> 我已設計一個共用核心層（如 <code>DocService</code>）並被 2 種以上介面重複使用。</li>
+  <li><input type="checkbox" disabled> 我能畫出架構的信任邊界並標出每個套件的攻擊面。</li>
+</ul>
+
+</div>
+
 </footer>
 </div>
 </body>

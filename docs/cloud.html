@@ -215,6 +215,107 @@ for pdf in Path("scans/").glob("*.pdf"):
 
 </div>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>⑤ 專案級端到端 Worked Example：多來源文件擷取管線 + 智慧路由 + 成本追蹤</h2>
+<p>場景：你的團隊要把來自三個來源的文件（FTP 機器上的歷史 PDF、S3 的掃描收據、SharePoint 的 Office 文件）
+全部轉成 Markdown 進向量資料庫。每種來源有不同的格式分佈——PDF 多掃描件、Office 多電子版。
+你要建一條<strong>智慧路由管線</strong>：電子版走本機、掃描版走 CU、其他格式跳過雲端——
+並在每次轉換後記錄「花多少錢、省多少錢」。</p>
+<pre># 1. 三來源擷取 + 統一路由（routing_pipeline.py）
+import boto3, os, tempfile
+from pathlib import Path
+from markitdown import MarkItDown
+from markitdown.converters import ContentUnderstandingFileType
+
+md = MarkItDown(
+    cu_endpoint=os.environ["CU_ENDPOINT"],
+    cu_file_types=[ContentUnderstandingFileType.PDF],
+)
+
+def route_and_convert(path: Path) -> dict:
+    """智慧路由：電子 PDF 走本機，掃描 PDF 走 CU，Office 走本機，其他跳過。"""
+    ext = path.suffix.lower()
+    if ext not in (".pdf", ".docx", ".xlsx", ".pptx"):
+        return {"path": str(path), "status": "skipped", "chars": 0}
+
+    if ext == ".pdf":
+        # 先試本機
+        local_text = md.convert_local(str(path)).markdown
+        if len(local_text.strip()) >= 100:
+            return {"path": str(path), "status": "local", "chars": len(local_text),
+                    "cost": 0}
+        # 品質不足 → CU 升級
+        cu_text = md.convert_local(str(path), use_content_understanding=True).markdown
+        return {"path": str(path), "status": "cu", "chars": len(cu_text),
+                "cost": estimate_cu_cost(path)}
+
+    # Office 格式一律本機
+    text = md.convert_local(str(path)).markdown
+    return {"path": str(path), "status": "local", "chars": len(text), "cost": 0}
+
+def estimate_cu_cost(path: Path) -> float:
+    """簡易計費估算：CU 每頁約 $0.01（示意值）"""
+    try:
+        import pdfplumber
+        with pdfplumber.open(str(path)) as pdf:
+            return len(pdf.pages) * 0.01
+    except Exception:
+        return 0.05  # 預估</pre>
+<pre># 2. 批次執行 + 統計
+results = []
+for pdf in Path("scans/").rglob("*.pdf"):
+    results.append(route_and_convert(pdf))
+for docx in Path("office/").rglob("*.docx"):
+    results.append(route_and_convert(docx))
+
+local_count = sum(1 for r in results if r["status"] == "local")
+cu_count = sum(1 for r in results if r["status"] == "cu")
+total_cost = sum(r.get("cost", 0) for r in results)
+
+print(f"本地: {local_count}  CU 升級: {cu_count}  總花費: ${total_cost:.2f}")</pre>
+<pre># 預期輸出
+本地: 1,847  CU 升級: 153  總花費: $1.53
+# 沒有 cu_file_types 的話：全部 2,000 份都走 CU → $20.00（13x 成本）</pre>
+<p><strong>為什麼這是「整專案規模」</strong>：第 1 輪是「本機＋CU 混和路由」單一檔案；
+這裡是<strong>多來源、多格式、自動路由、成本追蹤的完整管線</strong>——
+cu_file_types 讓「只有掃描 PDF 才走 CU」成為可執行策略，而不是口號。
+成本追蹤讓「雲端值不值得」變成可量測的數字。</p>
+
+<h2>⑥ 效能／品質／安全深度：雲端轉換的三面考量</h2>
+<ul>
+  <li><strong>效能</strong>：CU 每次呼叫有 cold start 延遲（首次約 2-5 秒），
+  批次處理時可用<strong>連線池</strong>降低；大檔（>50 頁）考慮<strong>分段上傳</strong>避免逾時。
+  用 <code>cu_file_types</code> 過濾可減少不必要的 API 呼叫——每過濾一個格式就省一筆請求。</li>
+  <li><strong>品質</strong>：CU 的<strong>結構化欄位</strong>只在 analyzer 有定義時才出現——
+  用預建 <code>prebuilt-documentSearch</code> 只有版面文字，沒有欄位；
+  要拿發票金額/合約條款，必須用自訂 analyzer。很多人「用了 CU 但沒有欄位」是因為 analyzer 選錯。</li>
+  <li><strong>安全</strong>：文件內容上傳到 Azure——<strong>資料離開你的網路邊界</strong>。
+  需確認：(1) Azure 資源的資料保留政策（預設 24 小時），(2) 是否需要 VNET 介面卡隔離，
+  (3) 敏感文件（個資/財務）是否該走本機而非雲端。計費端點的 API Key 不能出現在前端或版本控制。</li>
+</ul>
+
+<h2>⑦ 文件間比較對照表：雲端 vs 相關頁</h2>
+<table>
+  <tr><th>面向</th><th>本文（Azure 雲端轉換）</th><th>相關文（Python API／轉換器／安全模型）</th><th>差異說明</th></tr>
+  <tr><td>路徑選擇</td><td>Document Intelligence vs Content Understanding 兩條</td><td>python-api 講 5 個 convert_* 入口；converters 講 22 個內建</td><td>本文是「雲端升級路徑」，其餘是「本機基礎」</td></tr>
+  <tr><td>計費</td><td>每次 CU 呼叫計費 + cu_file_types 篩選</td><td>本機無計費；docker 是固定成本</td><td>本文有「每次呼叫成本」，其餘是「環境成本」</td></tr>
+  <tr><td>品質上限</td><td>掃描 PDF、複雜表格、影片的最高品質路徑</td><td>converters 列出內建限制；how-it-works 講假成功</td><td>本文是「補上限制」，其餘是「指出限制在哪」</td></tr>
+  <tr><td>安全邊界</td><td>資料離開本機 → Azure 雲端</td><td>security 頁講信任邊界；docker 頁講容器隔離</td><td>本文的安全是「資料外流」，其餘是「輸入消毒」</td></tr>
+</table>
+
+<h2>⑧ 互動式檢核清單：進階驗收</h2>
+<ul class="checklist">
+  <li><input type="checkbox" disabled> 我能說出 Document Intelligence 與 Content Understanding 的核心差異。</li>
+  <li><input type="checkbox" disabled> 我已用 <code>cu_file_types</code> 限制哪些格式走 CU，並解釋省下的成本。</li>
+  <li><input type="checkbox" disabled> 我了解 CU 的 YAML front matter 只在 analyzer 有定義欄位時才出現。</li>
+  <li><input type="checkbox" disabled> 我已設計「本機先試→ CU 升級」的補償路由並實作品質閘。</li>
+  <li><input type="checkbox" disabled> 我知道雲端轉換的資料外流風險，並評估過敏感文件是否該走本機。</li>
+  <li><input type="checkbox" disabled> 我能比較同一份掃描 PDF 用內建 / DocIntel / CU 三種輸出的差異。</li>
+</ul>
+
+</div>
+
 </footer>
 </div>
 </body>

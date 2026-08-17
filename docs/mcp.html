@@ -193,6 +193,97 @@ curl -X POST http://127.0.0.1:3001/mcp \
 
 </div>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>⑤ 專案級端到端 Worked Example：多 Agent 文件處理平台</h2>
+<p>場景：你的公司有 5 個 AI Agent（研究助理、合約審查、財務分析、會議紀錄、客服回覆），
+每個都需要轉換不同來源的文件。你要建一個<strong>共享的 markitdown-mcp 平台</strong>，
+所有 Agent 透過 MCP 協定連線，統一管控——只部署一份、全部共用。</p>
+<pre># 1. 平台架構（docker-compose.platform.yml）
+version: "3.8"
+services:
+  markitdown-mcp:
+    image: markitdown-mcp:latest
+    ports:
+      - "127.0.0.1:3001:3001"      # 只綁 localhost
+    volumes:
+      - /srv/shared-docs:/workdir:ro  # 只讀掛載
+      - /var/log/md-mcp:/var/log/md:rw
+    environment:
+      - MAX_FILE_SIZE=52428800       # 50MB 限制
+    command: markitdown-mcp --http --host 0.0.0.0 --port 3001
+    read_only: true
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+    user: "1000:1000"
+
+# 2. 五個 Agent 的 MCP client 設定
+# agent-configs/claude-desktop.json
+{
+  "mcpServers": {
+    "markitdown": {
+      "url": "http://127.0.0.1:3001/mcp"
+    }
+  }
+}
+# 其他 Agent（自訂工具）用相同 URL 連線</pre>
+<pre># 3. 健康檢查 + 監控
+# 平台管理員定期執行
+curl -s -X POST http://127.0.0.1:3001/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"tool":"convert_to_markdown","uri":"file:///workdir/test.pdf"}' \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'chars: {len(d.get(\"markdown\",\"\"))}')"
+
+# 預期輸出
+chars: 12840   # 正常
+# chars: 0     # 有問題（可能是空 PDF 或掛載錯誤）</pre>
+<p><strong>為什麼這是「整專案規模」</strong>：第 1 輪是「Docker 掛載 + 團隊共享」；
+這裡是<strong>多 Agent 統一平台、資源隔離、監控、唯讀掛載、非 root</strong>——
+不只是「能用」，而是「多人共用時不互相干擾、出問題能追溯」。
+所有 Agent 只連一個端點，部署、升級、監控都只做一次。</p>
+
+<h2>⑥ 效能／品質／安全深度：MCP 平台的三面考量</h2>
+<ul>
+  <li><strong>效能</strong>：MCP 的 STDIO 模式是<strong>單執行緒同步</strong>——一個 Agent 在轉換時，
+  其他 Agent 必須等待。Streamable HTTP 模式可並行處理多個請求，但需要 HTTP 基礎設施。
+  建議：STDIO 用於<strong>單 Agent 個人使用</strong>（Claude Desktop），
+  HTTP 用於<strong>多 Agent 共享平台</strong>。大檔（>10MB）轉換時，MCP 呼叫可能逾時——
+  考慮拆檔或用非同步 transport。</li>
+  <li><strong>品質</strong>：MCP 是<strong>單一工具</strong> <code>convert_to_markdown(uri)</code>——
+  沒有品質閘、沒有例外分類、沒有格式特定驗證。品質控制只能在 Agent 端做
+  （收到 Markdown 後自己檢查字數/結構）。
+  建議：平台管理員在 MCP server 前加一層<strong>反向代理</strong>做統一品質驗證，
+  而不是信任每個 Agent 自己做。</li>
+  <li><strong>安全</strong>：MCP server <strong>無認證</strong>——同機任何程序都能呼叫。
+  用 <code>read_only</code> 掛載 + 非 root 使用者 + 資源限制做深度防禦。
+  <strong>不要在 MCP URI 中暴露絕對路徑</strong>——用 <code>/workdir/</code> 統一路徑空間，
+  避免路徑資訊洩漏到 Agent 的輸出中。</li>
+</ul>
+
+<h2>⑦ 文件間比較對照表：MCP vs 相關頁</h2>
+<table>
+  <tr><th>面向</th><th>本文（markitdown-mcp）</th><th>相關文（Python API／Docker／安全模型）</th><th>差異說明</th></tr>
+  <tr><td>介面</td><td>單一 <code>convert_to_markdown(uri)</code> 工具</td><td>Python API 有 5 個 convert_*；CLI 有 12+ 旗標</td><td>MCP 最簡單但最不靈活</td></tr>
+  <tr><td>傳輸</td><td>STDIO / Streamable HTTP / SSE 三種</td><td>API 是程序內函數呼叫；Docker 是容器執行</td><td>MCP 是「跨程序/跨網路」協定</td></tr>
+  <tr><td>安全</td><td>無認證 + localhost 綁定</td><td>security 頁講消毒；API 講最窄方法</td><td>MCP 的安全靠「基礎設施隔離」而非「輸入驗證」</td></tr>
+  <tr><td>部署</td><td>Docker 或本機 pip install</td><td>Docker 頁講映像建置；架構頁講四套件</td><td>MCP 可以最輕量（pip install），也可以最隔離（Docker）</td></tr>
+</table>
+
+<h2>⑧ 互動式檢核清單：進階驗收</h2>
+<ul class="checklist">
+  <li><input type="checkbox" disabled> 我能用 STDIO、Streamable HTTP、SSE 三種模式各啟動一次 MCP server。</li>
+  <li><input type="checkbox" disabled> 我已用 MCP Inspector 測試 <code>convert_to_markdown</code> 並觀察回傳結構。</li>
+  <li><input type="checkbox" disabled> 我知道 MCP 無認證的風險，並用 Docker 沙箱 + localhost 綁定做隔離。</li>
+  <li><input type="checkbox" disabled> 我能解釋 STDIO（單執行緒）vs HTTP（可並行）的效能差異。</li>
+  <li><input type="checkbox" disabled> 我已把 MCP URI 統一用 <code>/workdir/</code> 路徑空間，避免路徑洩漏。</li>
+  <li><input type="checkbox" disabled> 我能設計「多 Agent 共享平台」的架構，包含資源限制與監控。</li>
+</ul>
+
+</div>
+
 </footer>
 </div>
 </body>

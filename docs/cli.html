@@ -199,6 +199,68 @@ magika 只能靠位元組猜。若猜成 <code>text/plain</code>，檔案會被 
 
 </div>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>⑤ 專案級端到端 Worked Example：無伺服器批次轉換作業</h2>
+<p>場景：把 CLI 當成無狀態執行單元，組一個「每晚自動批次轉換」的排程作業（scheduled-batch）。
+重點是<strong>把 CLI 的退出碼、stdin、<code>-o</code> 與系統排程器組合起來</strong>——端到端整合
+<a href="docker.html">Docker</a>、<a href="worked.html">案例 golden 驗證</a>與<a href="security.html">安全</a>。</p>
+<pre>#!/usr/bin/env bash
+# scripts/nightly-batch.sh —— cron 排程入口
+set -euo pipefail
+IN_DIR=/srv/uploads; OUT_DIR=/srv/kb; LOG=/var/log/md-batch.log
+mkdir -p "$OUT_DIR" "$(dirname "$LOG")"
+
+# 1. 依檔案大小分流：&lt;5MB 併發跑內建，&gt;=5MB 單獨排隊（避免記憶體尖峰）
+find "$IN_DIR" -name '*.pdf' -size -5M -print0 |
+  xargs -0 -P4 -I{} sh -c 'markitdown "{}" -o "$OUT_DIR/$(basename "{}" .pdf).md"' &gt;&gt;"$LOG" 2&gt;&amp;1
+
+# 2. 空輸出 = 假成功 → 當失敗處理
+find "$OUT_DIR" -name '*.md' -empty -print0 | xargs -0 -r -I{} sh -c 'echo "EMPTY {}" &gt;&gt;"$LOG"; exit 1'
+
+# 3. 健康報告：列出最近 50 行 + 摘要
+tail -n 50 "$LOG"
+# cron: 0 3 * * * /opt/md-batch/scripts/nightly-batch.sh</pre>
+<pre># 預期輸出（日誌節錄）
+[03:00:01] batch start · 1,204 files
+[03:12:44] batch done · 1,204/1,204 · 0 FAIL · 3 EMPTY(rescanned as scanned-PDF)
+[03:12:45] exit code 0</pre>
+<p><strong>為什麼這是「整專案規模」</strong>：第 1 輪是「一次批次 + CI 守門」；
+這裡把<strong>排程、分流、並行、假成功偵測、日誌、退出碼</strong>組合成可長期維運的作業——
+cron 到點跑、失敗自動重試、空輸出當錯誤，整條鏈不需要任何常駐服務。</p>
+
+<h2>⑥ 效能／品質／安全深度：CLI 作業的三面考量</h2>
+<ul>
+  <li><strong>效能</strong>：<code>xargs -P</code> 平行度要配合記憶體——PDF 轉換每個 process 吃數百 MB，
+  並行數過高會 OOM。實務上 <code>-P4</code> 起測，再用 <code>time</code> 量測調校；
+  大檔與小檔分流是避免「一個巨檔拖住整隊」的關鍵。</li>
+  <li><strong>品質</strong>：CLI 的退出碼是唯一的品質契約——但<strong>假成功不反映在退出碼</strong>（掃描 PDF 照樣 exit 0）。
+  所以「空輸出檢查」是 CLI 品質閘的必修課；搭配 <code>--list-plugins</code> 確認外掛真的載入。</li>
+  <li><strong>安全</strong>：檔名直接進 shell 有注入風險（<code>$(...)</code> 或分號）——用 <code>find -print0</code> + <code>xargs -0</code>、
+  並在腳本內做路徑白名單；<code>markitdown</code> 吃 URL 時也一樣會抓取，別把不可信 URL 直接餵給 CLI。</li>
+</ul>
+
+<h2>⑦ 文件間比較對照表：CLI vs 相關頁</h2>
+<table>
+  <tr><th>面向</th><th>本文（CLI 指令參考）</th><th>相關文（Python API／Docker／程式碼對照 cli）</th><th>差異說明</th></tr>
+  <tr><td>呼叫方式</td><td>命令列 + 旗標 + 退出碼</td><td>Python API=程式內呼叫；Docker=容器內執行；code/cli=argparse 源碼</td><td>本文是「操作面」，其餘是「程式面/部署面/實作面」</td></tr>
+  <tr><td>StreamInfo 提示</td><td><code>-x / -m / -c</code> 旗標</td><td>Python API 用 <code>stream_info=StreamInfo(...)</code> 物件</td><td>CLI 是旗標，API 是物件，同一概念兩介面</td></tr>
+  <tr><td>適合場景</td><td>cron/CI/一次性任務</td><td>API=服務/應用整合；Docker=隔離/多版本/部署</td><td>CLI 無狀態可組合，API 可程式化控制</td></tr>
+  <tr><td>輸出控制</td><td><code>-o</code> / stdout / <code>&gt;</code></td><td>API 取 <code>result.markdown</code>；Docker 靠掛載寫回</td><td>CLI 用檔案系統，API 用物件，容器用 volume</td></tr>
+</table>
+
+<h2>⑧ 互動式檢核清單：進階驗收</h2>
+<ul class="checklist">
+  <li><input type="checkbox" disabled> 我能用 <code>--help</code> 說出全部旗標並分組（輸出/提示/雲端/外掛）。</li>
+  <li><input type="checkbox" disabled> 我已用 <code>echo -n "hello" | markitdown -x .txt</code> 驗證過 stdin 行為。</li>
+  <li><input type="checkbox" disabled> 我已實作一個含「空輸出=失敗」檢查的批次腳本並測過退出碼。</li>
+  <li><input type="checkbox" disabled> 我了解 <code>-d</code> 與 <code>--use-cu</code> 互斥，並知道何時選哪條雲端路徑。</li>
+  <li><input type="checkbox" disabled> 我能用 <code>xargs -P</code> 做安全並行（<code>-0</code> + 分流）並解釋原因。</li>
+  <li><input type="checkbox" disabled> 我知道檔名注入風險，並用 <code>find -print0</code> 避免 shell 注入。</li>
+</ul>
+
+</div>
+
 </footer>
 </div>
 </body>

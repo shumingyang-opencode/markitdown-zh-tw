@@ -209,6 +209,76 @@ for path in Path("docs/").rglob("*"):
 
 </div>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>⑤ 專案級端到端 Worked Example：異質文件倉庫標準化平台</h2>
+<p>場景：一個法律事務所要把 40 年的異質檔案（DOCX 合約、掃描 PDF、XLSX 帳目、PPTX 簡報、
+ZIP/EPUB 檔案、Outlook .msg）全部標準化成 Markdown 進電子檔案庫。重點不是「一個 converter」，
+而是<strong>逐格式定義品質契約</strong>——整合 <a href="python-api.html">Python API</a>、
+<a href="plugins.html">外掛</a>、<a href="cloud.html">雲端</a>與 <a href="worked.html">案例 golden 檔</a>。</p>
+<pre># 1. 逐格式品質契約：每種格式定義「驗收條件」
+CONTRACTS = {
+    ".docx": lambda t: t.count("#") &gt;= 1 and "|" in t,       # 有標題 + 有表格
+    ".pdf":  lambda t: len(t.split()) &gt;= 300,                # 掃描 PDF 會掛這
+    ".xlsx": lambda t: t.count("|") &gt;= 5,                    # 至少一張像樣的表
+    ".pptx": lambda t: "Slide number" in t,                  # 有分頁結構
+    ".msg":  lambda t: "From:" in t or "Subject:" in t,      # 有郵件標頭
+    ".zip":  lambda t: "Content from the zip file" in t,     # 有遞迴內容
+}
+
+# 2. 逐檔路由：契約不過 → 外掛補強 → 雲端升級
+for path in Path("archive/").rglob("*"):
+    if path.suffix not in CONTRACTS:
+        continue
+    text = md.convert_local(str(path)).markdown
+    if CONTRACTS[path.suffix](text):
+        status = "PASS"
+    else:
+        text = md.convert_local(str(path), enable_plugins=True).markdown
+        status = "PASS(plugin)" if CONTRACTS[path.suffix](text) else "FAIL"
+    print(f"{status:&gt;12} {path}")</pre>
+<pre># 3. 預期輸出
+      PASS  archive/2001/contract.docx       # 標題+表格齊全
+PASS(plugin) archive/2005/scanned.pdf        # 內建抽不出 → OCR 外掛補上
+      FAIL  archive/1999/ledger.xlsx         # 全是合併格 → 列入人工處理
+# 產出報告：PASS 91% · PASS(plugin) 6% · FAIL 3%</pre>
+<p><strong>為什麼這是「整專案規模」</strong>：第 1 輪處理「單一批次的驗證閘」；
+這裡把<strong>格式契約、自動升級、人工排程</strong>組合成一整套檔案庫標準化流程，
+失敗清單變成可追蹤的工單，而不是「轉壞了就默默埋進庫裡」。</p>
+
+<h2>⑥ 效能／品質／安全深度：22 個轉換器的三面檢視</h2>
+<ul>
+  <li><strong>效能</strong>：converter 成本差異很大——<code>CsvConverter</code> 毫秒級、
+  <code>PdfConverter</code>（pdfminer+pdfplumber）秒級、圖片/音訊含 LLM/轉錄呼叫分鐘級。
+  批次設計應<strong>依格式分流</strong>：小檔高併發、大檔排隊，避免單一慢檔卡住整條管線。</li>
+  <li><strong>品質</strong>：結構性失真多發生在「表格」——CSV 分隔符猜錯、PDF 無邊框表格缺格、
+  XLSX 合併格變 <code>NaN</code>。驗證閘必須<strong>格式特定</strong>，通用字數閘擋不住結構問題。</li>
+  <li><strong>安全</strong>：<code>ZipConverter</code> 對 zip bomb（壓縮比極高的惡意檔）可能耗盡磁碟；
+  URL 家族（Wikipedia/YouTube/Bing）會真的發網路請求；<code>OutlookMsgConverter</code> 解 OLE 結構。
+  處理不可信檔案時應先做<strong>大小/層數/目的地白名單</strong>。</li>
+</ul>
+
+<h2>⑦ 文件間比較對照表：轉換器全覽 vs 相關頁</h2>
+<table>
+  <tr><th>面向</th><th>本文（轉換器全覽）</th><th>相關文（實作案例／程式碼對照／雲端）</th><th>差異說明</th></tr>
+  <tr><td>內容</td><td>22 個 converter 的「是什麼、依賴、限制」清單</td><td>worked=真實輸出；code/converters=實作細節；cloud=雲端補強</td><td>本文是目錄，其餘是證據與原始碼</td></tr>
+  <tr><td>表格處理</td><td>列出三條技術路線（CSV/PDF/XLSX）</td><td>worked 的 sales-data.xlsx 展示 NaN 實例</td><td>本文講「怎麼做」，案例講「長什麼樣」</td></tr>
+  <tr><td>限制</td><td>逐格式已知限制表</td><td>cloud 頁說明雲端如何補上掃描 PDF/表格限制</td><td>本文指出「哪裡弱」，雲端頁給「升級路徑」</td></tr>
+  <tr><td>依賴</td><td>extras 對照表是核心</td><td>install 頁講安裝；docker 頁講容器化全裝</td><td>本文講「要裝什麼」，其餘講「怎麼裝」</td></tr>
+</table>
+
+<h2>⑧ 互動式檢核清單：進階驗收</h2>
+<ul class="checklist">
+  <li><input type="checkbox" disabled> 我能對 22 個 converter 各說出它的輸入、依賴與主要限制。</li>
+  <li><input type="checkbox" disabled> 我理解 CSV／PDF／XLSX 三條表格解析路線的差異與各自失真點。</li>
+  <li><input type="checkbox" disabled> 我已實作一個「格式特定」的品質閘並套用到至少 3 種格式。</li>
+  <li><input type="checkbox" disabled> 我了解 zip bomb、URL converter 網路請求等安全風險並寫進防護。</li>
+  <li><input type="checkbox" disabled> 我已設計依格式分流的批次策略（小檔併發、大檔排隊）。</li>
+  <li><input type="checkbox" disabled> 我能列出哪幾種格式需要雲端／LLM／外掛才能達到高品質。</li>
+</ul>
+
+</div>
+
 </footer>
 </div>
 </body>

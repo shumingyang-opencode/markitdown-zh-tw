@@ -170,6 +170,93 @@ CI 與本機的結果才可能一致。用 <code>:ro</code> 唯讀掛載輸入�
 
 </div>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>⑤ 專案級端到端 Worked Example：容器化文件轉換農場 + 資源限制 + 日誌聚合</h2>
+<p>場景：你的公司有 5 台伺服器，每台跑一個 Docker 容器做批次轉換。
+容器要<strong>限制記憶體</strong>（避免 pdfminer 吃光 RAM）、<strong>限制 CPU</strong>（避免影響其他服務）、
+並<strong>把日誌聚合到中央</strong>——出問題時能追溯到單一檔案。</p>
+<pre># 1. docker-compose.yml —— 生產級轉換農場
+version: "3.8"
+services:
+  converter:
+    image: markitdown:latest
+    deploy:
+      resources:
+        limits:
+          memory: 512M       # pdfminer 每個 process 約 200-400MB
+          cpus: "0.5"        # 限半核，避免拖慢主機
+    volumes:
+      - ./uploads:/in:ro     # 唯讀：不允許改動原始檔
+      - ./output:/out:rw     # 可寫：轉換結果
+      - ./logs:/var/log/md:rw
+    read_only: true          # 只讀根檔案系統
+    tmpfs:
+      - /tmp:size=100M       # 暫存空間（ZIP 解壓等）
+    user: "1000:1000"        # 非 root
+    command: >
+      sh -c 'for f in /in/*.pdf; do
+        markitdown "$f" -o "/out/$(basename "${f%.pdf}").md" 2>>/var/log/md/convert.log;
+      done'</pre>
+<pre># 2. 批次執行 + 日誌聚合（5 台機器的統一入口）
+#!/usr/bin/env bash
+set -euo pipefail
+SERVERS=("srv1" "srv2" "srv3" "srv4" "srv5")
+for srv in "${SERVERS[@]}"; do
+  ssh "$srv" "cd /opt/md-farm && docker compose run --rm converter" &
+done
+wait
+# 聚合所有機器的日誌
+for srv in "${SERVERS[@]}"; do
+  scp "$srv:/opt/md-farm/logs/convert.log" "logs/${srv}.log"
+done
+cat logs/*.log | sort | uniq -c | sort -rn > logs/summary.log</pre>
+<pre># 3. 預期輸出（日誌聚合）
+  1,847 SUCCESS
+    153 FAIL (empty output)
+      3 FAIL (ModuleNotFoundError)
+# 退出碼：0=全成功，1=有失敗，2=容器啟動失敗</pre>
+<p><strong>為什麼這是「整專案規模」</strong>：第 1 輪是「單一容器批次」；
+這裡是<strong>多機器、資源隔離、非 root、唯讀根、日誌聚合</strong>的生產級部署——
+容器不只是「跑得起來」，還要「不拖垮主機、不洩漏資料、出問題能追溯」。</p>
+
+<h2>⑥ 效能／品質／安全深度：容器化的三面考量</h2>
+<ul>
+  <li><strong>效能</strong>：Docker 映像的<strong>首次啟動成本</strong>（pull + 初始化）約 3-10 秒，
+  批次處理時用 <code>docker compose run</code> 而非 <code>docker run</code> 可共用網路/卷設定。
+  <strong>multi-stage build</strong> 可把映像從 ~1GB 瘦身到 ~300MB（只留執行時依賴）。
+  併發時注意：容器間共享主機 I/O，過多並行會互相干擾。</li>
+  <li><strong>品質</strong>：容器的<strong>環境一致性</strong>是品質的基礎——
+  本機跑 0.1.7、容器跑 0.1.6 的「版本漂移」會導致輸出差異。
+  用 <code>markitdown -v</code> 釘版本、在 CI 中用相同映像做回歸測試，
+  確保「容器 = 本機 = CI」三環境一致。</li>
+  <li><strong>安全</strong>：容器預設以 <strong>root</strong> 執行——加上 <code>--user</code> 降到非 root。
+  <code>read_only: true</code> 阻止寫入根檔案系統；<code>tmpfs</code> 提供有限暫存空間。
+  掛載目錄用 <code>:ro</code> 唯讀——批次任務不該修改原始檔。
+  <strong>不要在映像中硬編碼 API Key</strong>，用環境變數或 secret manager。</li>
+</ul>
+
+<h2>⑦ 文件間比較對照表：Docker vs 相關頁</h2>
+<table>
+  <tr><th>面向</th><th>本文（Docker）</th><th>相關文（CLI／Python API／架構）</th><th>差異說明</th></tr>
+  <tr><td>環境</td><td>容器隔離，映像封裝所有依賴</td><td>CLI=本機 Python；API=程式內；架構=概念結構</td><td>本文是「部署環境」，其餘是「執行環境」</td></tr>
+  <tr><td>批次</td><td>容器內 shell 迴圈 + 掛載卷</td><td>CLI 的 find+xargs 併發；API 的 Path.rglob</td><td>容器用「目錄掛載」，本機用「檔案掃描」</td></tr>
+  <tr><td>隔離</td><td>容器等級（namespace/cgroup）</td><td>venv 等級（Python 套件隔離）</td><td>容器隔離更徹底（含系統工具），venv 只隔離 Python</td></tr>
+  <tr><td>MCP</td><td>Docker 啟動 markitdown-mcp</td><td>mcp 頁講三種 transport</td><td>本文是「怎麼跑在容器內」，MCP 頁是「怎麼連接」</td></tr>
+</table>
+
+<h2>⑧ 互動式檢核清單：進階驗收</h2>
+<ul class="checklist">
+  <li><input type="checkbox" disabled> 我能寫出含 resource limits + read_only + non-root 的 docker-compose.yml。</li>
+  <li><input type="checkbox" disabled> 我已用 <code>-i</code> 旗標測試過 stdin 管道轉換。</li>
+  <li><input type="checkbox" disabled> 我了解容器與本機的「版本漂移」風險，並用 <code>markitdown -v</code> 釘版本。</li>
+  <li><input type="checkbox" disabled> 我能用 multi-stage build 減少映像大小，並量測差異。</li>
+  <li><input type="checkbox" disabled> 我已設定 tmpfs 暫存空間限制，避免 ZIP 解壓耗盡磁碟。</li>
+  <li><input type="checkbox" disabled> 我能設計「多機器批次 + 日誌聚合」的排程架構。</li>
+</ul>
+
+</div>
+
 </footer>
 </div>
 </body>

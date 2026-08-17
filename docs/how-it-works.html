@@ -241,6 +241,71 @@ def quality_gate(ok_count, total, threshold=0.95):
 
 </div>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>⑤ 專案級端到端 Worked Example：智慧路由文件服務</h2>
+<p>場景：把「調度管線」知識放大成一個整專案——「文件智慧路由服務」（doc-router）。
+它不只轉檔，還<strong>依據 StreamInfo 猜測與品質閘自動決定走哪條路</strong>：
+本機內建 → OCR 外掛 → Azure 雲端，三級路由，端到端整合 <a href="converters.html">轉換器</a>、
+<a href="python-api.html">Python API</a>、<a href="cloud.html">雲端</a>與<a href="security.html">安全</a>。</p>
+<pre># 1. 管線骨架：同一份文件走三級路由
+def route_convert(md, path):
+    text = md.convert_local(path).markdown          # 第一級：本機內建
+    if quality_ok(path, text):                       # 品質閘過 → 完成
+        return text, "local"
+    text = md.convert_local(path, enable_plugins=True)  # 第二級：OCR 外掛
+    if quality_ok(path, text):
+        return text, "ocr"
+    return md.convert_local(path, use_content_understanding=True).markdown, "cu"  # 第三級：雲端
+
+# 2. 品質閘：結合「頁數 vs 字數」與結構檢查
+def quality_ok(path, text):
+    import pdfplumber
+    with pdfplumber.open(path) as pdf:
+        pages = len(pdf.pages)
+    words = len(text.split())
+    return words &gt;= 30 and words &gt;= pages * 40        # 每頁至少 40 字</pre>
+<pre># 3. 預期輸出（對 3 種文件各跑一次）
+報告: electronic.pdf   → local (12 頁, 3840 字)   OK
+報告: scanned.pdf      → local 品質不足 → ocr → cu (11 頁, 2105 字)  UPGRADED
+圖片: layout.png       → local (EXIF+LLM 描述)                        OK</pre>
+<p><strong>為什麼這是「整專案規模」</strong>：第 1 輪是「在批次裡偵測空字串」；
+這裡把<strong>偵測→升級→路由決策</strong>串成一條可營運的服務——品質閘同時是路由開關，
+三級路徑各自對應一篇 docs（內建/外掛/雲端），最後只剩真正需要付費的文件才上雲。</p>
+
+<h2>⑥ 效能／品質／安全深度：調度層的三面檢視</h2>
+<ul>
+  <li><strong>效能</strong>：每次 <code>convert()</code> 的成本 = guesses × converters 的嘗試次數。
+  guess 越多、兜底 converter 越多，失敗成本越高；<strong>先給對的 StreamInfo</strong>（<code>-x</code> / <code>stream_info</code>）
+  可讓第一個 guess 就命中，省掉整串嘗試。大檔批次時考慮併發，但注意 <code>_convert</code> 內有 <code>seek</code>，
+  非執行緒安全，併發要用 process pool 而非 thread pool。</li>
+  <li><strong>品質</strong>：<code>normalize()</code> 只做「行尾空白 + 連續換行」的輕量標準化，<strong>不保證語意完整</strong>。
+  品質必須自己加閘（字數、結構、頁數比對）——這是本站反覆強調的「假成功」對策。</li>
+  <li><strong>安全</strong>：<code>accepts()</code> 也是外部程式碼（外掛時）；magika 是純本機模型不發網路。
+  但 <code>convert_uri()</code> 的 http/https 猜測會真的抓取——伺服器場景務必先消毒輸入。</li>
+</ul>
+
+<h2>⑦ 文件間比較對照表：調度管線 vs 相關頁</h2>
+<table>
+  <tr><th>面向</th><th>本文（運作原理）</th><th>相關文（架構／轉換器／程式碼對照 core）</th><th>差異說明</th></tr>
+  <tr><td>關注層級</td><td>一次 <code>convert()</code> 的<strong>行為流程</strong></td><td>架構=模組與依賴；轉換器=各格式細節；core=函數實作</td><td>本文是「過程」，架構是「地圖」</td></tr>
+  <tr><td>容錯</td><td>容錯鏈 + attempt 聚合是核心主題</td><td>架構僅提「容錯鏈」原則；core 展示 <code>except</code> 實作</td><td>本文解釋「為什麼」，core 顯示「怎麼寫」</td></tr>
+  <tr><td>型別猜測</td><td>StreamInfo + magika 五步驟之一</td><td>python-api 頁詳述 StreamInfo 用法；code/stream-info 講源碼</td><td>本文講「在管線中的位置」，其餘講「怎麼用/怎麼寫」</td></tr>
+  <tr><td>輸出</td><td>normalize 標準化規則</td><td>worked 案例展示真實輸出；converters 講各格式結構</td><td>本文講規則，案例頁講結果</td></tr>
+</table>
+
+<h2>⑧ 互動式檢核清單：進階驗收</h2>
+<ul class="checklist">
+  <li><input type="checkbox" disabled> 我能畫出 <code>_convert()</code> 的完整五步驟流程圖並口頭解釋每一步。</li>
+  <li><input type="checkbox" disabled> 我已故意破壞一個 PDF（內容為亂碼）並觀察容錯鏈行為。</li>
+  <li><input type="checkbox" disabled> 我能解釋「先給對的 StreamInfo 可降低失敗成本」的效能原理。</li>
+  <li><input type="checkbox" disabled> 我已用「頁數 vs 字數」實作一個能抓掃描 PDF 假成功的品質閘。</li>
+  <li><input type="checkbox" disabled> 我能區分 <code>FileConversionException</code> 與 <code>UnsupportedFormatException</code> 的觸發時機。</li>
+  <li><input type="checkbox" disabled> 我了解外掛的 <code>accepts()</code> 是外部程式碼，並採取對應安全措施。</li>
+</ul>
+
+</div>
+
 </footer>
 </div>
 </body>

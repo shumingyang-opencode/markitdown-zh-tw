@@ -222,6 +222,82 @@ HTTP 細節（UA、驗證、proxy、timeout、重試）由你掌控，MarkItDown
 
 </div>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>⑤ 專案級端到端 Worked Example：文件轉換微服務</h2>
+<p>場景：把 Python API 的窄入口、品質閘與安全守則組合成一個<strong>對外文件轉換微服務</strong>（doc-svc）。
+它同時是 <a href="mcp.html">MCP</a>、內部批次、外部 API 三種消費者的共用後端——
+端到端整合 <a href="security.html">安全</a>、<a href="how-it-works.html">調度原理</a>與<a href="cloud.html">雲端</a>。</p>
+<pre># app.py —— FastAPI 版本（節錄）
+from fastapi import FastAPI, HTTPException
+from markitdown import MarkItDown
+from markitdown._exceptions import FileConversionException, UnsupportedFormatException
+import tempfile, os
+from pathlib import Path
+
+app = FastAPI()
+ALLOWED_DIR = Path("/srv/uploads").resolve()
+md = MarkItDown(enable_plugins=False)          # 單一實例重用（效能）
+
+def safe_save(upload) -&gt; Path:                  # 消毒：白名單目錄 + 隨機檔名
+    p = ALLOWED_DIR / (tempfile.NamedTemporaryFile(dir=ALLOWED_DIR, suffix=Path(upload.filename).suffix).name)
+    with open(p, "wb") as f: f.write(upload.file.read())
+    return p
+
+@app.post("/convert")
+def convert(upload):                            # 窄 API + 品質閘 + 例外分類
+    p = safe_save(upload)
+    try:
+        text = md.convert_local(str(p)).markdown
+        if len(text.strip()) &lt; 100:
+            raise HTTPException(422, "conversion too short (scanned PDF? try /convert-ocr)")
+        return {"markdown": text, "chars": len(text)}
+    except (FileConversionException, UnsupportedFormatException) as e:
+        raise HTTPException(422, f"{type(e).__name__}: {e}")
+    finally:
+        p.unlink(missing_ok=True)</pre>
+<pre># 預期輸出
+$ curl -F file=@contract.docx http://localhost:8000/convert
+{ "markdown": "# 合約…", "chars": 12840 }
+$ curl -F file=@scanned.pdf http://localhost:8000/convert
+{"detail": "conversion too short (scanned PDF? try /convert-ocr)"}</pre>
+<p><strong>為什麼這是「整專案規模」</strong>：第 1 輪是「帶重試的抓取器」；
+這裡把<strong>上傳、消毒、窄 API、品質閘、例外映射、清理</strong>組合成可上線的 HTTP 服務——
+錯誤變成有語意的 <code>422</code>，而不是堆疊追蹤；掃描 PDF 被品質閘精準攔下並引導到升級路徑。</p>
+
+<h2>⑥ 效能／品質／安全深度：API 服務的三面考量</h2>
+<ul>
+  <li><strong>效能</strong>：<code>MarkItDown()</code> 實例可安全重用（converter 清單建立一次）；
+  但 <code>_convert()</code> 內部對 stream 做 <code>seek</code>，<strong>共用實例的並行呼叫並非執行緒安全</strong>——
+  高併發服務請用 process pool 或每 worker 一實例（FastAPI 的 worker 模型天然隔離）。</li>
+  <li><strong>品質</strong>：品質閘（字數/結構）應放在服務層，讓「壞轉換」在 API 邊界就被擋下；
+  記錄每個請求的 <code>chars / status</code> 當可觀測指標，追蹤品質隨版本漂移。</li>
+  <li><strong>安全</strong>：上傳檔名不可信——<code>os.path.basename</code> 消毒 + 白名單目錄 +
+  隨機檔名避免路徑穿越與同名覆寫；<code>enable_plugins=False</code> 關掉任意碼執行面；
+  URL 輸入走白名單 scheme + 封鎖 metadata service（<code>169.254.169.254</code>）。</li>
+</ul>
+
+<h2>⑦ 文件間比較對照表：Python API vs 相關頁</h2>
+<table>
+  <tr><th>面向</th><th>本文（Python API）</th><th>相關文（CLI／MCP／安全模型）</th><th>差異說明</th></tr>
+  <tr><td>介面</td><td>程式內 5 個 <code>convert_*</code> 方法</td><td>CLI=命令列；MCP=單一 <code>convert_to_markdown(uri)</code> 工具</td><td>API 最靈活，CLI 最無狀態，MCP 最通用</td></tr>
+  <tr><td>安全性</td><td>官方建議「用最窄方法」的對象</td><td>security 頁把規則展開成消毒清單</td><td>本文給工具，security 頁給紀律</td></tr>
+  <tr><td>StreamInfo</td><td><code>stream_info=StreamInfo(...)</code> 物件</td><td>CLI 用 <code>-x/-m/-c</code> 旗標生成同一物件</td><td>同一概念、兩個介面，源頭都是線索卡</td></tr>
+  <tr><td>控制粒度</td><td>可拿 response、可自控 HTTP</td><td>MCP 只收 URI，抓取交給 server；CLI 由工具代抓</td><td>API 是「你控制」，其餘是「它控制」</td></tr>
+</table>
+
+<h2>⑧ 互動式檢核清單：進階驗收</h2>
+<ul class="checklist">
+  <li><input type="checkbox" disabled> 我能說出 5 個 <code>convert_*</code> 方法的輸入型別與適用場景。</li>
+  <li><input type="checkbox" disabled> 我能在專案中只用最窄的 API（<code>convert_local</code>/<code>convert_response</code>）完成任務。</li>
+  <li><input type="checkbox" disabled> 我已用 <code>StreamInfo</code> 處理過「無副檔名 stream」並觀察準確度提升。</li>
+  <li><input type="checkbox" disabled> 我能解釋共用 <code>MarkItDown()</code> 實例在併發下的限制。</li>
+  <li><input type="checkbox" disabled> 我已把品質閘 + 例外映射放進一個 HTTP 服務的邊界層。</li>
+  <li><input type="checkbox" disabled> 我能處理 data URI 截斷問題（<code>--keep-data-uris</code> 或後處理）。</li>
+</ul>
+
+</div>
+
 </footer>
 </div>
 </body>

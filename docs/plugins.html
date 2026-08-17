@@ -203,6 +203,75 @@ __plugin_interface_version__ = 1</pre>
 
 </div>
 
+<div class="guide" style="text-align:left; margin-top:2.5rem; border-top:1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>⑤ 專案級端到端 Worked Example：企業內部外掛生態系</h2>
+<p>場景：公司要建立<strong>內部外掛生態系</strong>——RTF 合約、舊版 .doc、專屬報表格式都要有專屬 converter，
+並統一發布給所有團隊。重點是把<a href="architecture.html">架構的 priority 機制</a>、
+<a href="python-api.html">API</a>、<a href="how-it-works.html">容錯鏈</a>與 CI 組合成可治理的流程。</p>
+<pre># 1. 外掛倉庫結構（內部 PyPI + 原始碼）
+plugins/
+  rtf/        → 內建不支援 → priority -1.0（搶在 PlainText 兜底前）
+  olddoc/     → 商業格式   → priority -1.0
+  brand/      → 品牌專用排版 → priority 10.0（最後才兜底處理）
+
+# 2. 每個外掛附一份契約測試（CI 強制）
+# tests/test_contract.py —— 驗證「安裝即註冊 + 優先序正確」
+def test_registered(plugin_name):
+    md = MarkItDown(enable_plugins=True)
+    names = [c.converter.__class__.__name__ for c in md._converters]
+    assert plugin_name in names
+
+def test_priority_lt_zero():
+    md = MarkItDown(enable_plugins=True)
+    classes = [c.converter.__class__.__name__ for c in md._converters]
+    assert classes.index("RtfConverter") &lt; classes.index("PlainTextConverter")
+
+# 3. 發布流程：合規審核 → 內部 PyPI → 團隊 pip install
+# 審核項目：來源可信 / 無網路呼叫 / 無副檔名誤攔 / 有契約測試</pre>
+<pre># 預期輸出（CI）
+$ pytest plugins/rtf/tests/ -q
+4 passed · 2 skipped（外掛未安裝環境）
+# 發布後：團隊
+$ pip install company-rtf-plugin
+$ markitdown --list-plugins
+company-rtf-plugin 0.2.1 (markitdown.plugin)</pre>
+<p><strong>為什麼這是「整專案規模」</strong>：第 1 輪是「寫一個外掛」；
+這裡把<strong>多外掛的 priority 策略、契約測試、發布審核、安裝分發</strong>組合成一套可治理的生態系——
+priority 不只是技術細節，而是<strong>團隊之間的「接管權」協定</strong>（誰的格式歸誰處理）。</p>
+
+<h2>⑥ 效能／品質／安全深度：外掛的三面考量</h2>
+<ul>
+  <li><strong>效能</strong>：OCR 外掛把整頁渲染成 300 DPI 圖片送 LLM——<strong>每個影像都一次付費 API 呼叫</strong>，
+  大文件可能分鐘級。務必只在內建品質不足時才啟用，並對 <code>llm_client</code> 設 timeout 與重試上限。</li>
+  <li><strong>品質</strong>：外掛的「靜默略過」是品質陷阱——沒 <code>llm_client</code> 時 OCR 外掛照常載入但退回內建。
+  驗收時檢查輸出是否真的含 <code>[Image OCR]</code> 區塊，而不是只看「有輸出」。</li>
+  <li><strong>安全</strong>：外掛 = 任意程式碼執行（<code>accepts()</code> 與 <code>convert()</code> 都是外部程式）。
+  生態系必須有<strong>信任鏈</strong>——只安裝內部審核過的外掛；生產環境預設 <code>enable_plugins=False</code>，
+  需要時再逐個白名單啟用。</li>
+</ul>
+
+<h2>⑦ 文件間比較對照表：外掛系統 vs 相關頁</h2>
+<table>
+  <tr><th>面向</th><th>本文（外掛系統）</th><th>相關文（架構／程式碼對照 OCR／雲端）</th><th>差異說明</th></tr>
+  <tr><td>協定</td><td>entry-point + <code>register_converters()</code> 是核心</td><td>code/ocr 展示 LLMVisionOCRService 實作；architecture 講插槽</td><td>本文講「怎麼接」，其餘講「怎麼寫」</td></tr>
+  <tr><td>優先序</td><td>priority 控制覆寫順序</td><td>architecture 解釋「後註冊者優先」機制</td><td>本文是應用面，架構頁是機制面</td></tr>
+  <tr><td>補強目標</td><td>本機格式補強（OCR/RTF）</td><td>cloud 走雲端補強（掃描 PDF/CU）；兩者可並存</td><td>外掛補「本機能力」，雲端補「品質上限」</td></tr>
+  <tr><td>風險</td><td>任意碼執行 + 靜默略過</td><td>security 頁講信任外掛；docker 頁講隔離外掛</td><td>本文提風險，安全頁給對策</td></tr>
+</table>
+
+<h2>⑧ 互動式檢核清單：進階驗收</h2>
+<ul class="checklist">
+  <li><input type="checkbox" disabled> 我能寫出外掛三件套（<code>DocumentConverter</code> + <code>register_converters</code> + entry-point）。</li>
+  <li><input type="checkbox" disabled> 我理解 priority 負值/正值/零值各代表什麼，並能預測嘗試順序。</li>
+  <li><input type="checkbox" disabled> 我已用 <code>--list-plugins</code> 驗證過外掛是否真的載入。</li>
+  <li><input type="checkbox" disabled> 我知道 OCR 外掛的「靜默略過」並會用 <code>[Image OCR]</code> 檢查輸出。</li>
+  <li><input type="checkbox" disabled> 我了解外掛的效能成本（LLM 呼叫）與安全風險（任意碼）。</li>
+  <li><input type="checkbox" disabled> 我已建立外掛的信任審核流程（來源、契約測試、白名單）。</li>
+</ul>
+
+</div>
+
 </footer>
 </div>
 </body>
