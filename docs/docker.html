@@ -68,6 +68,51 @@ docker run -it --rm -v /home/user/data:/workdir markitdown-mcp:latest</pre>
 <footer>
   <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+
+<h2>概念解說</h2>
+<p>Docker 模式的核心價值是<strong>環境隔離</strong>：不污染本機 Python 環境，
+所有依賴（pdfminer、mammoth、openpyxl…）都封裝在容器映像中。
+適用場景：(1) 不想在本機裝依賴、(2) 需要乾淨隔離（配合外掛/多版本）、
+(3) CI/CD 管線中使用。</p>
+<p>容器預設無法存取本機檔案——需要掛載目錄（<code>-v</code>）才能讀寫。</p>
+
+<h2>實際操作 Worked Example</h2>
+<h3>步驟 1：建映像</h3>
+<pre># 從 repo 根目錄（含 Dockerfile）建映像
+docker build -t markitdown:latest .</pre>
+
+<h3>步驟 2：轉換本機檔案（stdin 管道）</h3>
+<pre># 用 stdin 管道把 PDF 送進容器
+docker run --rm -i markitdown:latest &lt; report.pdf &gt; report.md
+
+# 或掛載目錄
+docker run --rm -v $(pwd):/workdir markitdown:latest \
+  markitdown /workdir/report.pdf -o /workdir/report.md</pre>
+
+<h3>步驟 3：markitdown-mcp Docker</h3>
+<pre># 啟動 MCP server
+docker run -it --rm -v $(pwd):/workdir markitdown-mcp:latest
+
+# 搭配 Claude Desktop
+# claude_desktop_config.json:
+# { "mcpServers": { "markitdown": {
+#   "command": "docker",
+#   "args": ["run", "--rm", "-i", "-v", "/data:/workdir", "markitdown-mcp:latest"]
+# }}}</pre>
+
+<h2>常見錯誤與除錯</h2>
+<div class="callout warn"><strong>容器內找不到檔案</strong><br>
+確認 <code>-v</code> 掛載路徑正確。容器內以掛載點為根目錄存取，不是本機路徑。</div>
+<div class="callout warn"><strong>映像建置失敗</strong><br>
+確認 Dockerfile 在 repo 根目錄。常見問題：Docker daemon 未啟動、磁碟空間不足。</div>
+
+<h2>練習與驗收</h2>
+<ol>
+  <li>建好映像後，用 <code>docker run --rm markitdown:latest markitdown --help</code> 確認 CLI 可用。</li>
+  <li>掛載一個目錄，轉換其中的 PDF，確認輸出寫回掛載點。</li>
+  <li>用 <code>docker images | grep markitdown</code> 確認映像大小。</li>
+</ol>
+
 </footer>
 </div>
 </body>

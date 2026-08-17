@@ -101,6 +101,51 @@
 <footer>
   <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+
+<h2>概念解說</h2>
+<p>22 個轉換器可按輸入來源分為<strong>五大家族</strong>：
+Office（DOCX/XLSX/PPTX）、PDF、Web（HTML/RSS/Wikipedia/YouTube/Bing SERP）、
+Media（圖片/音訊）、封裝（ZIP/EPUB/CSV/Outlook/Jupyter）。
+每個 converter 實作兩個方法：<code>accepts()</code> 判斷是否能處理（通常看 mimetype/extension），
+<code>convert()</code> 執行實際轉換。</p>
+<p>priority 決定嘗試順序：特定格式 converter 為 <code>0.0</code>，
+兜底的 PlainText/Html/Zip 為 <code>10.0</code>。外掛可用負值（如 OCR 的 <code>-1.0</code>）搶先內建。</p>
+
+<h2>實際操作 Worked Example</h2>
+<h3>步驟 1：依格式挑 converter</h3>
+<pre># PDF → PdfConverter（依賴 pdfminer.six + pdfplumber）
+markitdown report.pdf -o report.md
+
+# XLSX → XlsxConverter（依賴 pandas + openpyxl）
+markitdown data.xlsx -o data.md
+
+# 網頁 URL → HtmlConverter（依賴 beautifulsoup4）
+markitdown https://example.com -o page.md</pre>
+
+<h3>步驟 2：觀察輸出差異</h3>
+<pre># PDF：文字 + 表格（MasterFormat 合併）
+# XLSX：每工作表一個 ## 標題 + Markdown 表格
+# HTML：標題/清單/連結/表格結構保留</pre>
+
+<h3>步驟 3：測試兜底 converter</h3>
+<pre># 沒有對應 converter 的格式會 fallback 到 PlainTextConverter
+echo '{"key":"value"}' | markitdown -x .json</pre>
+
+<h2>常見錯誤與除錯</h2>
+<div class="callout warn"><strong>PDF 表格抽取不完整</strong><br>
+pdfplumber 對複雜合併儲存格或掃描版 PDF 效果有限。嘗試用 Azure Document Intelligence（<code>-d</code> 旗標）取得更好結果。</div>
+<div class="callout warn"><strong>XLSX 輸出缺少格式</strong><br>
+XlsxConverter 只抽取文字和數字，不保留儲存格格式、公式結果、圖表。這是設計取捨——專注於「可 LLM 消化的純文字」。</div>
+<div class="callout info"><strong>YouTube 字幕為空</strong><br>
+YouTubeConverter 依賴 <code>youtube-transcription</code> 套件。若影片無字幕或字幕被關閉，輸出只含標題和描述。</div>
+
+<h2>練習與驗收</h2>
+<ol>
+  <li>準備一份有合併儲存格的 XLSX，觀察 Markdown 表格如何處理合併格。</li>
+  <li>找一個有掃描圖片的 PDF，比較本地轉換與 Azure Document Intelligence 的差異。</li>
+  <li>用 <code>echo "hello" | markitdown -x .xyz</code> 測試未知格式的 fallback 行為。</li>
+</ol>
+
 </footer>
 </div>
 </body>

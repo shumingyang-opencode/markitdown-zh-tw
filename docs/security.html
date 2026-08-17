@@ -92,6 +92,60 @@ control over URI fetching, call <code>requests.get()</code> yourself and pass th
 <footer>
   <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+
+<h2>概念解說</h2>
+<p>MarkItDown 的安全模型核心：<strong>I/O 權限等同目前程序</strong>。
+它會存取「程序本身能存取」的資源——這和 <code>open()</code>、<code>requests.get()</code> 一樣。
+三條守則：(1) 消毒輸入、(2) 只用最窄的 convert_* 函數、(3) 信任你的 converter。</p>
+<p>最容易忽略的風險是<strong>路徑穿越</strong>：使用者傳入 <code>../../etc/passwd</code> 這類路徑時，
+MarkItDown 會照樣讀——因為它只是執行 <code>open()</code>。伺服器應用必須先驗證路徑。</p>
+
+<h2>實際操作 Worked Example</h2>
+<h3>步驟 1：示範路徑穿越風險</h3>
+<pre>from markitdown import MarkItDown
+md = MarkItDown()
+# 危險：直接把使用者輸入丟給 convert()
+result = md.convert(user_input)  # user_input = "../../etc/passwd"</pre>
+
+<h3>步驟 2：正確做法——限制路徑範圍</h3>
+<pre>import os
+from markitdown import MarkItDown
+
+SAFE_DIR = "/data/uploads"
+user_input = "../../etc/passwd"
+
+# 先驗證：解析路徑、確認在安全目錄內
+resolved = os.path.realpath(os.path.join(SAFE_DIR, user_input))
+if not resolved.startswith(os.path.realpath(SAFE_DIR)):
+    raise ValueError("路徑穿越！")
+
+md = MarkItDown()
+result = md.convert_local(resolved)  # 用最窄的 convert_local()</pre>
+
+<h3>步驟 3：限制 URI scheme</h3>
+<pre>from urllib.parse import urlparse
+
+def safe_convert_uri(md, uri):
+    parsed = urlparse(uri)
+    if parsed.scheme not in ("http", "https", "file"):
+        raise ValueError(f"不支援的 scheme: {parsed.scheme}")
+    if parsed.hostname in ("169.254.169.254", "localhost", "127.0.0.1"):
+        raise ValueError("封鎖私有位址")
+    return md.convert_uri(uri)</pre>
+
+<h2>常見錯誤與除錯</h2>
+<div class="callout warn"><strong>SSRF 風險</strong><br>
+<code>convert_uri()</code> 能讀任何 URL，包括內網位址。伺服器應用必須封鎖 loopback、link-local、metadata-service（169.254.169.254）。</div>
+<div class="callout warn"><strong>外掛 = 任意程式碼執行</strong><br>
+第三方外掛的 <code>convert()</code> 會以你的權限執行。只安裝信任來源的外掛。</div>
+
+<h2>練習與驗收</h2>
+<ol>
+  <li>寫一個函數：接收使用者路徑，驗證在安全目錄內後才呼叫 <code>convert_local()</code>。</li>
+  <li>測試 <code>convert_uri()</code> 對 <code>http://169.254.169.254/</code> 的行為。</li>
+  <li>比較 <code>convert()</code> 與 <code>convert_local()</code> 的權限範圍差異。</li>
+</ol>
+
 </footer>
 </div>
 </body>

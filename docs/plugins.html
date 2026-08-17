@@ -96,6 +96,49 @@ def register_converters(markitdown: MarkItDown, **kwargs):
 <footer>
   <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+
+<h2>概念解說</h2>
+<p>MarkItDown 的外掛系統基於 Python <strong>entry-point</strong> 機制。
+外掛套件在 <code>pyproject.toml</code> 宣告 <code>[project.entry-points."markitdown.plugin"]</code>，
+匯出 <code>register_converters(markitdown, **kwargs)</code> 函數。
+每次建立 <code>MarkItDown(enable_plugins=True)</code> 時，會自動載入所有已安裝外掛。</p>
+<p>外掛可以<strong>在任何 priority 註冊 converter</strong>——包括負值（搶在內建之前）或正值（兜底之後）。
+這讓 markitdown-ocr 能以 <code>priority -1.0</code> 在內建 PDF/DOCX converter 之前攔截，注入 OCR 增強。</p>
+
+<h2>實際操作 Worked Example</h2>
+<h3>步驟 1：安裝官方 OCR 外掛</h3>
+<pre>pip install markitdown-ocr openai
+
+# 確認外掛已安裝
+markitdown --list-plugins</pre>
+
+<h3>步驟 2：用外掛轉換含圖片的 PDF</h3>
+<pre># 啟用外掛 + LLM 圖片描述
+markitdown document.pdf --use-plugins -o out.md
+
+# Python API
+from markitdown import MarkItDown
+from openai import OpenAI
+md = MarkItDown(enable_plugins=True, llm_client=OpenAI(), llm_model="gpt-4o")
+result = md.convert("document.pdf")</pre>
+
+<h3>步驟 3：觀察 OCR 輸出差異</h3>
+<pre># 內建：只抽取文字層
+# 外掛：在文字旁插入 *[Image OCR]...&lt;LLM 識別文字&gt;[End OCR]*</pre>
+
+<h2>常見錯誤與除錯</h2>
+<div class="callout warn"><strong>外掛裝了但沒生效</strong><br>
+執行 <code>markitdown --list-plugins</code> 確認外掛是否被偵測。若不在清單中，檢查 <code>pyproject.toml</code> 的 entry-point 宣告。</div>
+<div class="callout warn"><strong>OCR 外掛靜默略過</strong><br>
+沒有 <code>llm_client</code> 時，OCR 外掛仍載入但「靜默略過」——退回內建 converter。不會報錯，但也沒有 OCR 增強。</div>
+
+<h2>練習與驗收</h2>
+<ol>
+  <li>安裝 markitdown-sample-plugin，用 <code>--list-plugins</code> 確認。</li>
+  <li>閱讀 sample-plugin 的 <code>register_converters()</code>，理解外掛如何插入 converter。</li>
+  <li>故意移除 entry-point 宣告，觀察外掛消失的行為。</li>
+</ol>
+
 </footer>
 </div>
 </body>

@@ -104,6 +104,57 @@ print(result.markdown)               # 含 YAML front matter</pre>
 <footer>
   <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+
+<h2>概念解說</h2>
+<p>MarkItDown 的 Python API 提供 5 個 <code>convert_*</code> 方法，從最通用到最窄：
+<code>convert()</code>（自動分派）、<code>convert_local()</code>（本機檔案）、
+<code>convert_stream()</code>（位元組流）、<code>convert_uri()</code>（URI/URL）、
+<code>convert_response()</code>（requests.Response）。官方建議<strong>只用最窄的方法</strong>——
+縮小攻擊面、避免意外的網路或檔案系統存取。</p>
+<p>回傳值 <code>DocumentConverterResult</code> 有三個欄位：<code>markdown</code>（原始 Markdown）、
+<code>text_content</code>（同義別名）、<code>title</code>（部分 converter 會填）。</p>
+
+<h2>實際操作 Worked Example</h2>
+<h3>步驟 1：基本本機轉換</h3>
+<pre>from markitdown import MarkItDown
+
+md = MarkItDown()
+result = md.convert_local("report.pdf")
+print(result.markdown[:200])  # 前 200 字元</pre>
+
+<h3>步驟 2：從 URL 轉換（控制 HTTP 請求）</h3>
+<pre>import requests
+from markitdown import MarkItDown
+
+md = MarkItDown()
+resp = requests.get("https://example.com", headers={"User-Agent": "MyApp/1.0"})
+result = md.convert_response(resp)
+print(result.text_content)</pre>
+
+<h3>步驟 3：帶 LLM 圖片描述</h3>
+<pre>from markitdown import MarkItDown
+from openai import OpenAI
+
+client = OpenAI()
+md = MarkItDown(llm_client=client, llm_model="gpt-4o")
+result = md.convert("photo.jpg")
+print(result.text_content)  # 含 EXIF + LLM 描述</pre>
+
+<h2>常見錯誤與除錯</h2>
+<div class="callout warn"><strong>PermissionError: [Errno 13]</strong><br>
+使用 <code>convert()</code> 時，它會嘗試多種方式（本機/URI）。改用 <code>convert_local()</code> 可避免意外的網路嘗試。</div>
+<div class="callout warn"><strong>convert_uri() 超時</strong><br>
+預設無 timeout。建議自己 <code>requests.get(timeout=30)</code> 後用 <code>convert_response()</code>。</div>
+<div class="callout info"><strong>StreamInfo 提示</strong>：<br>
+當 stream 缺少副檔名線索時，手動建立 <code>StreamInfo(extension=".docx")</code> 可大幅提升格式偵測準確度。</div>
+
+<h2>練習與驗收</h2>
+<ol>
+  <li>用 <code>convert_local()</code> 轉換一個 DOCX，再用 <code>convert()</code> 轉換同一檔案，比較結果。</li>
+  <li>寫一個腳本：從 stdin 讀取 bytes，用 <code>convert_stream()</code> + <code>StreamInfo</code> 轉換。</li>
+  <li>故意傳入不存在的檔案路徑，觀察例外類型與錯誤訊息。</li>
+</ol>
+
 </footer>
 </div>
 </body>

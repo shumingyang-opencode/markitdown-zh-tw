@@ -107,6 +107,57 @@ print(result.text_content)</pre>
 <footer>
   <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+
+<h2>概念解說</h2>
+<p>Azure 雲端路徑解決內建 converter 的兩個限制：(1) 掃描版 PDF / 複雜表格的版面分析、
+(2) 音訊 / 影片的結構化抽取。兩條路徑：<strong>Document Intelligence</strong>（文件專用）和
+<strong>Content Understanding</strong>（多模態，涵蓋文件/圖/音/影）。</p>
+<p>Content Understanding 的獨特價值：<strong>結構化欄位抽取</strong>（發票金額、合約條款）會序列化成 YAML front matter，
+以及<strong>自訂 analyzer</strong>支援特定領域的欄位定義。</p>
+
+<h2>實際操作 Worked Example</h2>
+<h3>步驟 1：安裝 Azure 依賴</h3>
+<pre># Content Understanding
+pip install 'markitdown[az-content-understanding]'
+
+# 或 Document Intelligence
+pip install 'markitdown[az-doc-intel]'</pre>
+
+<h3>步驟 2：用 CU 轉換掃描 PDF</h3>
+<pre>from markitdown import MarkItDown
+md = MarkItDown(cu_endpoint="https://&lt;resource&gt;.cognitiveservices.azure.com/")
+result = md.convert("scanned_report.pdf")
+print(result.markdown)  # 含 YAML front matter + 版面分析結果</pre>
+
+<h3>步驟 3：用自訂 analyzer 抽取發票欄位</h3>
+<pre>md = MarkItDown(
+    cu_endpoint="&lt;endpoint&gt;",
+    cu_analyzer_id="my-invoice-analyzer",
+)
+result = md.convert("invoice.pdf")
+# 輸出含：
+# ---
+# contentType: document
+# fields:
+#   VendorName: CONTOSO LTD.
+#   InvoiceDate: '2019-11-15'
+#   TotalAmount: 1234.56
+# ---</pre>
+
+<h2>常見錯誤與除錯</h2>
+<div class="callout warn"><strong>每個 convert() 都是計費呼叫</strong><br>
+用 <code>cu_file_types</code> 限制哪些格式才走 CU，避免意外計費。例如只讓 PDF 走 CU：
+<code>cu_file_types=[ContentUnderstandingFileType.PDF]</code></div>
+<div class="callout warn"><strong>認證失敗</strong><br>
+確認 Azure 資源的端點 URL 正確、API Key 已設定（環境變數或參數傳入）。</div>
+
+<h2>練習與驗收</h2>
+<ol>
+  <li>建立 Azure Content Understanding 資源，取得端點和 API Key。</li>
+  <li>用預建 analyzer 轉換一份掃描 PDF，觀察 YAML front matter 輸出。</li>
+  <li>用 <code>cu_file_types</code> 限制只有 PDF 走 CU，測試 XLSX 是否仍用內建轉換。</li>
+</ol>
+
 </footer>
 </div>
 </body>

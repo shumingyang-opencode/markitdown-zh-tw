@@ -88,6 +88,55 @@ docker run -it --rm -v /home/user/data:/workdir markitdown-mcp:latest</pre>
 <footer>
   <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+
+<h2>概念解說</h2>
+<p>markitdown-mcp 把核心 MarkItDown 包裝成 <strong>MCP（Model Context Protocol）Server</strong>，
+暴露單一工具 <code>convert_to_markdown(uri)</code>。支援三種傳輸層：
+STDIO（最適合 MCP client）、Streamable HTTP（REST-like）、SSE（Server-Sent Events）。</p>
+<p>設計上只給<strong>本機、受信任的 agent</strong> 使用。伺服器無認證，
+以執行者的權限運作——所以 <code>convert_to_markdown</code> 能讀伺服器使用者可讀的任何檔案。</p>
+
+<h2>實際操作 Worked Example</h2>
+<h3>步驟 1：安裝與啟動 STDIO 模式</h3>
+<pre>pip install markitdown-mcp
+
+# STDIO 模式（最常用）
+markitdown-mcp</pre>
+
+<h3>步驟 2：啟動 HTTP 模式</h3>
+<pre># Streamable HTTP，綁本機
+markitdown-mcp --http --host 127.0.0.1 --port 3001
+
+# 測試：用 curl 呼叫
+curl -X POST http://127.0.0.1:3001/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"tool":"convert_to_markdown","uri":"https://example.com"}'</pre>
+
+<h3>步驟 3：接上 Claude Desktop</h3>
+<pre>// claude_desktop_config.json
+{
+  "mcpServers": {
+    "markitdown": {
+      "command": "markitdown-mcp"
+    }
+  }
+}</pre>
+
+<h2>常見錯誤與除錯</h2>
+<div class="callout warn"><strong>Connection refused: localhost:3001</strong><br>
+確認 <code>--host 127.0.0.1</code> 而非 <code>0.0.0.0</code>。預設只綁 localhost 是安全設計。</div>
+<div class="callout warn"><strong>Docker 容器內無法讀本機檔案</strong><br>
+需要掛載目錄：<code>-v /path/to/data:/workdir</code>。容器內以 <code>/workdir/</code> 存取。</div>
+<div class="callout info"><strong>除錯工具</strong>：<br>
+用 <code>npx @modelcontextprotocol/inspector</code> 可視化測試 MCP 工具呼叫。</div>
+
+<h2>練習與驗收</h2>
+<ol>
+  <li>啟動 STDIO 模式，用 MCP Inspector 測試 <code>convert_to_markdown</code>。</li>
+  <li>啟動 HTTP 模式，用 curl 呼叫 <code>convert_to_markdown</code> 轉換一個 URL。</li>
+  <li>配置 Claude Desktop 連接 markitdown-mcp，實際在對話中使用。</li>
+</ol>
+
 </footer>
 </div>
 </body>

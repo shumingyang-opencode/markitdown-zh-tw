@@ -72,6 +72,49 @@
 <footer>
   <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+
+<h2>概念解說</h2>
+<p>實作案例頁的目的是「用真實工具產出，不是示意圖」。
+本站用 markitdown 0.1.7 在本機 uv venv 實跑 11 種格式，提供原始輸入和轉換結果的前後對照。
+這是理解 MarkItDown 實際行為的最佳方式——比讀文件更直觀。</p>
+<p>五類案例涵蓋：Office 文件、PDF/網頁、媒體/封裝、dogfood（轉自己）、
+以及用 graphify 掃描 MarkItDown 源碼的知識圖譜。</p>
+
+<h2>實際操作 Worked Example</h2>
+<h3>步驟 1：選擇案例格式</h3>
+<pre># 依需求點選對應卡片：
+# Office → DOCX/XLSX/PPTX 的標題、清單、表格處理
+# PDF + 網頁 → 中文 PDF、HTML、CSV、JSON
+# Media + 封裝 → 圖片 EXIF、音訊轉錄、ZIP/EPUB</pre>
+
+<h3>步驟 2：對照輸出</h3>
+<pre># 每個案例頁提供：
+# 1. 原始檔案描述
+# 2. 轉換指令
+# 3. Markdown 輸出（完整或節錄）
+# 4. 輸出結構解說</pre>
+
+<h3>步驟 3：本地重現</h3>
+<pre># 安裝 markitdown
+pip install 'markitdown[all]'
+
+# 用相同指令重現案例
+markitdown sample-report.docx -o output.md
+cat output.md</pre>
+
+<h2>常見錯誤與除錯</h2>
+<div class="callout warn"><strong>輸出與案例頁不同</strong><br>
+版本差異是主因。本站釘選 v0.1.7（上游 fd239d5），你本地的版本可能不同。執行 <code>markitdown -v</code> 確認。</div>
+<div class="callout info"><strong>案例頁的 worked/ 目錄</strong><br>
+所有原始輸入檔和轉換輸出都放在 <code>worked/conversions/</code> 和 <code>worked/dogfood/</code>，可直接下載對照。</div>
+
+<h2>練習與驗收</h2>
+<ol>
+  <li>下載 worked/conversions/ 中的一個 DOCX，本地轉換後比較輸出差異。</li>
+  <li>找一份自己的 PDF，用 markitdown 轉換並觀察表格處理效果。</li>
+  <li>閱讀 dogfood 案例，理解「用工具轉自己」的 meta 示範。</li>
+</ol>
+
 </footer>
 </div>
 </body>

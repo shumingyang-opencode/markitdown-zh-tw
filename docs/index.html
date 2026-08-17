@@ -101,6 +101,39 @@
 <footer>
   <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+
+<h2>概念解說</h2>
+<p>文件教學入口整理了 MarkItDown 的所有核心主題：從運作原理（convert() 調度管線）到架構（四個套件）、
+轉換器（22 個內建 converter）、CLI、Python API、外掛、MCP、Azure 雲端、Docker、安全模型。</p>
+<p>建議學習路線：<strong>運作原理 → 架構 → 轉換器 → CLI/API → 外掛 → MCP → 雲端 → 安全</strong>。
+每個頁面都包含概念解說、實作案例、常見錯誤和練習。</p>
+
+<h2>實際操作 Worked Example</h2>
+<h3>步驟 1：從運作原理開始</h3>
+<pre># 點選「運作原理」卡片，理解 convert() 的五步驟管線：
+# StreamInfo 猜測 → magika 補強 → priority 排序 → accepts → convert</pre>
+
+<h3>步驟 2：跟著架構頁理解套件結構</h3>
+<pre># 四個套件：
+# markitdown（核心）→ markitdown-mcp（MCP Server）
+# markitdown-ocr（OCR 外掛）→ markitdown-sample-plugin（外掛範本）</pre>
+
+<h3>步驟 3：實作案例頁驗證理解</h3>
+<pre># 點選「實作案例」，用 11 種格式的真實輸出驗證你的理解</pre>
+
+<h2>常見錯誤與除錯</h2>
+<div class="callout info"><strong>不確定從哪裡開始？</strong><br>
+如果你是新手，先讀「運作原理」和「架構總覽」建立整體概念，再按興趣深入特定主題。</div>
+<div class="callout info"><strong>想快速上手？</strong><br>
+直接看「CLI 指令參考」和「實作案例」，5 分鐘內就能開始轉換檔案。</div>
+
+<h2>練習與驗收</h2>
+<ol>
+  <li>依序閱讀運作原理、架構、轉換器三頁，畫出你理解的 MarkItDown 架構圖。</li>
+  <li>用 CLI 轉換至少三種不同格式的檔案。</li>
+  <li>選一個主題（外掛/MCP/雲端），深入閱讀並完成該頁的練習。</li>
+</ol>
+
 </footer>
 </div>
 </body>

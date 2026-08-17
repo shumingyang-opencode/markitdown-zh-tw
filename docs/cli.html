@@ -95,6 +95,51 @@ $ markitdown https://pypi.org/project/markitdown/ -o pypi-page.md</pre>
 <footer>
   <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+
+<h2>概念解說</h2>
+<p>MarkItDown CLI 是一個 <code>argparse</code> 寫的命令列工具，核心邏輯很簡單：
+解析參數 → 建 <code>MarkItDown</code> 實例 → 呼叫 <code>convert</code> → 輸出到 stdout 或檔案。
+支援 stdin 管道、本機檔案、URL，以及 Azure 雲端服務。</p>
+<p>關鍵旗標：<code>-x</code>（提示副檔名，stdin 時必備）、<code>-o</code>（輸出到檔案）、
+<code>-p</code>（啟用外掛）、<code>-d</code>/<code>--use-cu</code>（Azure 雲端路徑）。</p>
+
+<h2>實際操作 Worked Example</h2>
+<h3>步驟 1：基本轉換</h3>
+<pre># 轉換本機 PDF
+markitdown report.pdf -o report.md
+
+# 轉換網址
+markitdown https://github.com/microsoft/markitdown -o github.md</pre>
+
+<h3>步驟 2：stdin 管道（關鍵：-x 提示副檔名）</h3>
+<pre># 從 stdin 讀取，提示是 CSV
+cat data.bin | markitdown -x .csv -o data.md
+
+# 從 stdin 讀取，提示 MIME type
+cat file.bin | markitdown -m "application/pdf" -o out.md</pre>
+
+<h3>步驟 3：外掛模式</h3>
+<pre># 先列出已安裝外掛
+markitdown --list-plugins
+
+# 使用外掛轉換
+markitdown document.pdf --use-plugins -o out.md</pre>
+
+<h2>常見錯誤與除錯</h2>
+<div class="callout warn"><strong>stdin 讀取時格式偵測失敗</strong><br>
+沒有副檔名線索時 magika 可能猜錯。務必加 <code>-x .ext</code> 或 <code>-m "type/subtype"</code> 提示。</div>
+<div class="callout warn"><strong>-d 與 --use-cu 不能同時用</strong><br>
+兩者是互斥的雲端路徑。Document Intelligence（<code>-d</code>）和 Content Understanding（<code>--use-cu</code>）只能擇一。</div>
+<div class="callout info"><strong>輸出亂碼？</strong><br>
+加 <code>-c UTF-8</code> 強制指定編碼。CLI 預設用 UTF-8 輸出，但輸入編碼偵測可能不準。</div>
+
+<h2>練習與驗收</h2>
+<ol>
+  <li>用 <code>markitdown -v</code> 確認版本，再用 <code>markitdown --help</code> 瀏覽所有旗標。</li>
+  <li>找一個 CSV 檔案，分別用 <code>-x .csv</code> 和不加 <code>-x</code> 轉換，比較結果。</li>
+  <li>用管道 <code>echo "hello" | markitdown</code> 測試 stdin 模式。</li>
+</ol>
+
 </footer>
 </div>
 </body>

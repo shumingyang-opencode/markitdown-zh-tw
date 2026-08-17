@@ -104,6 +104,53 @@
   </a>
 </div>
 
+<div class="guide" style="margin-top:2.5rem; border-top: 1px solid var(--line-strong); padding-top:1.5rem;">
+
+<h2>概念解說</h2>
+<p>程式碼對照區是「文件 → 源碼」的橋樑。每個收縮塊對應一個 Python 模組或類別，
+提供函式簽名、中文用途說明、以及關鍵邏輯的逐行講解。
+建議搭配<a href="../how-it-works.html">運作原理</a>和<a href="../architecture.html">架構總覽</a>一起閱讀。</p>
+<p>核心入口是 <code>MarkItDown</code> 類別（core.html），它串連了 CLI（cli.html）、
+converter 協定（base.html）、22 個內建轉換器（converters/）、
+以及外掛與 MCP 套件。</p>
+
+<h2>實際操作 Worked Example</h2>
+<h3>步驟 1：從核心入口開始</h3>
+<pre># 打開 core.html，找到 MarkItDown.__init__()
+# 觀察它如何註冊 22 個內建 converter：
+# - 每個 converter 帶 priority=0.0
+# - 外掛以 register_converter() 插入</pre>
+
+<h3>步驟 2：追蹤 convert() 調度鏈</h3>
+<pre># 在 core.html 找 _convert() 方法
+# 觀察五步驟：
+# 1. StreamInfo 猜測
+# 2. magika 補強
+# 3. priority 排序
+# 4. accepts() → convert()
+# 5. 標準化 + 容錯</pre>
+
+<h3>步驟 3：深入特定 converter</h3>
+<pre># 選一個感興趣的 converter（如 office.html 的 DOCX）
+# 觀察 accepts() 如何判斷 mimetype/extension
+# 觀察 convert() 如何用 mammoth 轉 HTML 再轉 Markdown</pre>
+
+<h2>常見錯誤與除錯</h2>
+<div class="callout warn"><strong>找不到對應的源碼？</strong><br>
+確認你閱讀的頁面與 markitdown 版本一致。本站對齊上游 fd239d5（v0.1.7）。
+版本不同可能有函式名或參數差異。</div>
+<div class="callout info"><strong>建議閱讀順序</strong>：<br>
+base.html（協定）→ core.html（入口）→ converters.html（概覽）→ 特定格式頁。</div>
+
+<h2>練習與驗收</h2>
+<ol>
+  <li>在 core.html 找到 <code>register_converter()</code> 方法，理解它如何將 converter 插入排序清單。</li>
+  <li>在 base.html 閱讀 <code>DocumentConverter</code> 的抽象方法定義，寫一個最小的自訂 converter。</li>
+  <li>選一個內建 converter（如 CsvConverter），在源碼中找到它的 <code>accepts()</code> 和 <code>convert()</code> 實作。</li>
+</ol>
+
+</div>
+
 <footer>
   <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>

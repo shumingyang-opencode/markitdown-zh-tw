@@ -99,6 +99,47 @@ markitdown-ocr ──→ MarkItDown（在 priority -1.0 註冊 OCR 增強 conver
 <footer>
   <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+
+<h2>概念解說</h2>
+<p>MarkItDown 的架構核心是<strong>策略模式</strong>：每個格式由一個獨立的 <code>DocumentConverter</code> 子類處理，
+由 <code>MarkItDown</code> 類別統一調度。四個套件各司其職——核心包提供 22 個內建轉換器，
+MCP 包把核心包裝成 HTTP/STDIO 服務，OCR 包用 LLM Vision 增強圖片文字抽取，
+sample-plugin 則是外掛開發的起點。</p>
+<p>關鍵設計原則：<strong>依賴延後</strong>（沒裝的格式只是不支援，不影響其他格式）、
+<strong>後註冊者優先</strong>（外掛可以覆蓋內建 converter）、
+<strong>容錯鏈</strong>（單一 converter 失敗不阻斷整個流程）。</p>
+
+<h2>實際操作 Worked Example</h2>
+<h3>步驟 1：觀察套件結構</h3>
+<pre># 列出四個套件目錄
+ls packages/
+# markitdown/  markitdown-mcp/  markitdown-ocr/  markitdown-sample-plugin/</pre>
+
+<h3>步驟 2：查看核心入口類別</h3>
+<pre># MarkItDown 類別在 _markitdown.py 中，核心方法：
+md = MarkItDown()
+result = md.convert("file.pdf")   # 進入 _convert() 調度鏈</pre>
+
+<h3>步驟 3：追蹤 converter 註冊</h3>
+<pre># MarkItDown.__init__() 內建 22 個 converter 以 priority 0.0 註冊
+# 外掛以 priority -1.0~10.0 註冊，後註冊者在前
+# 排序後：priority 小 → 大，同 priority 保持穩定排序</pre>
+
+<h2>常見錯誤與除錯</h2>
+<div class="callout warn"><strong>ModuleNotFoundError: No module named 'mammoth'</strong><br>
+原因是沒安裝對應 extras。執行 <code>pip install 'markitdown[all]'</code> 安裝全部依賴，
+或只裝需要的：<code>pip install 'markitdown[docx]'</code>。</div>
+<div class="callout warn"><strong>UnsupportedFormatException</strong><br>
+表示所有 converter 的 <code>accepts()</code> 都回傳 False。檢查副檔名是否正確、
+是否忘了 <code>-x</code> 旗標提示副檔名（stdin 場景）。</div>
+
+<h2>練習與驗收</h2>
+<ol>
+  <li>打開 <code>packages/markitdown/src/markitdown/_markitdown.py</code>，找到 <code>_convert()</code> 方法，畫出調度流程圖。</li>
+  <li>執行 <code>pip install markitdown</code> 後，用 <code>python -c "from markitdown import MarkItDown; print(dir(MarkItDown()))"</code> 確認可用方法。</li>
+  <li>故意不裝 <code>mammoth</code>，嘗試轉換 .docx，觀察錯誤訊息中的提示。</li>
+</ol>
+
 </footer>
 </div>
 </body>

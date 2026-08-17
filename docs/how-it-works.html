@@ -122,6 +122,58 @@ raise UnsupportedFormatException(...)</pre>
 <footer>
   <div>這是 <a href="https://github.com/microsoft/markitdown">microsoft/markitdown</a> 的非官方繁體中文教學站。</div>
   <div>內容 © <a href="https://github.com/microsoft/markitdown">Microsoft Corporation</a>（MIT）· 本站與 Microsoft / AutoGen Team 無關 · 對齊上游 main @ fd239d5</div>
+
+<h2>概念解說</h2>
+<p>MarkItDown 的 <code>convert()</code> 不是「直接讀檔案」，而是<strong>「猜測格式 → 依序嘗試 → 容錯」</strong>的管線。
+五個步驟：(1) 建立 StreamInfo 線索卡、(2) magika 讀位元組補強猜測、(3) 依 priority 排序 converters、
+(4) 逐一問 <code>accepts()</code>，接受就 <code>convert()</code>、(5) 輸出標準化 + 錯誤聚合。</p>
+<p>這個設計的關鍵價值是<strong>容錯鏈</strong>：某個 converter 在 convert() 中途失敗時，
+例外被接住、file_stream seek 回原位，繼續試下一個。最後才統一拋出包含所有嘗試的例外。</p>
+
+<h2>實際操作 Worked Example</h2>
+<h3>步驟 1：追蹤一個 PDF 的轉換流程</h3>
+<pre>from markitdown import MarkItDown
+md = MarkItDown()
+result = md.convert("report.pdf")
+# 內部流程：
+# 1. StreamInfo: mimetype=application/pdf, extension=.pdf
+# 2. magika 確認為 PDF（與線索一致）
+# 3. 依 priority 排序：PDF(0.0) → DOCX(0.0) → ... → PlainText(10.0)
+# 4. PDF.accepts() → True → PDF.convert() → 成功
+# 5. 標準化輸出 → DocumentConverterResult</pre>
+
+<h3>步驟 2：觀察容錯機制</h3>
+<pre># 如果 PDF converter 例外（如缺少 pdfminer）：
+# → FailedConversionAttempt 被記錄
+# → 繼續試下一個 converter
+# → 全部失敗才拋 FileConversionException</pre>
+
+<h3>步驟 3：手動觸發 UnsupportedFormatException</h3>
+<pre>from markitdown import MarkItDown
+md = MarkItDown()
+# 用一個所有 converter 都不接受的假格式
+import io
+stream = io.BytesIO(b"\x00\x00\x00\x00")
+from markitdown import StreamInfo
+try:
+    md.convert_stream(stream, stream_info=StreamInfo(extension=".fake"))
+except Exception as e:
+    print(type(e).__name__, e)</pre>
+
+<h2>常見錯誤與除錯</h2>
+<div class="callout warn"><strong>FileConversionException vs UnsupportedFormatException</strong><br>
+<code>UnsupportedFormatException</code>：沒有任何 converter 的 accepts() 回傳 True（格式完全不認識）。<br>
+<code>FileConversionException</code>：有 converter 接受了但 convert() 失敗（通常是缺少依賴或檔案損毀）。</div>
+<div class="callout info"><strong>除錯技巧</strong>：<br>
+<code>FileConversionException.attempts</code> 包含所有失敗的 converter 和例外資訊，是定位問題的最佳起點。</div>
+
+<h2>練習與驗收</h2>
+<ol>
+  <li>閱讀 <code>_markitdown.py</code> 中的 <code>_convert()</code> 方法，畫出完整的判斷流程圖。</li>
+  <li>故意破壞一個 PDF 檔案（改副檔名為 .pdf 但內容是亂碼），觀察容錯鏈的行為。</li>
+  <li>用 <code>StreamInfo</code> 手動提示副檔名，測試 stdin 場景下的格式偵測。</li>
+</ol>
+
 </footer>
 </div>
 </body>
